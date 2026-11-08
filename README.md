@@ -72,7 +72,7 @@ CREATE DATABASE IF NOT EXISTS studyflow_ai DEFAULT CHARSET utf8mb4;
 python main.py
 ```
 
-访问 API 文档：http://localhost:8000/docs
+访问 API 文档：http://localhost:8002/docs
 
 ## API 接口
 
