@@ -1,0 +1,25 @@
+# Web 框架
+fastapi>=0.115.0
+uvicorn>=0.30.6
+
+# 数据库
+sqlalchemy>=2.0.35
+pymysql>=1.1.1
+
+# AI / LLM（LangChain 1.x：create_agent + Function Calling）
+langchain>=1.0.0
+langchain-core>=1.0.0
+langchain-openai>=1.0.0
+langgraph>=1.0.0
+openai>=1.45.0
+
+# 向量检索
+faiss-cpu>=1.13.1
+sentence-transformers>=3.0.1
+
+# 认证
+python-jose>=3.3.0
+
+# 工具
+python-dotenv>=1.0.1
+pydantic>=2.9.0
