@@ -7,7 +7,8 @@ from app import engine, SessionLocal
 from app.models.problem import Base as ProblemBase
 from app.models.user import Base as UserBase
 from app.models.chat import Base as ChatBase
-from app.routers import categories, problems, recommend, chat, auth
+from app.models.error import Base as ErrorBase
+from app.routers import categories, problems, recommend, chat, auth, error
 
 logger = logging.getLogger(__name__)
 
@@ -18,6 +19,7 @@ async def lifespan(app: FastAPI):
     ProblemBase.metadata.create_all(bind=engine)
     UserBase.metadata.create_all(bind=engine)
     ChatBase.metadata.create_all(bind=engine)
+    ErrorBase.metadata.create_all(bind=engine)
 
     # 把数据库中的题目同步进 FAISS，保证语义检索可用
     from app.rag.retriever import sync_all_problems
@@ -52,6 +54,7 @@ app.include_router(categories.router)
 app.include_router(problems.router)
 app.include_router(recommend.router)
 app.include_router(chat.router)
+app.include_router(error.router)
 
 
 @app.get('/')

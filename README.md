@@ -20,16 +20,19 @@ studyflow-ai/
 │   ├── models/
 │   │   ├── problem.py       # 数据模型（Category, Problem）
 │   │   ├── user.py          # 用户表
-│   │   └── chat.py          # 会话与消息表（记忆持久化）
+│   │   ├── chat.py          # 会话与消息表（记忆持久化）
+│   │   └── error.py         # 错因归因表 + 六类错因枚举 + 字段校验
 │   ├── routers/
 │   │   ├── categories.py    # 知识点 API
 │   │   ├── problems.py      # 题目 API（含语义搜索）
 │   │   ├── recommend.py     # AI 推荐 API
-│   │   └── chat.py          # AI 对话 API（多轮记忆）
+│   │   ├── chat.py          # AI 对话 API（多轮记忆）
+│   │   └── error.py         # 错因分类 API（决策树 + 统计）
 │   ├── services/
 │   │   ├── llm.py           # 统一 LLM 客户端
 │   │   ├── memory.py        # LangChain 消息历史 -> MySQL
-│   │   └── recommend.py     # 推荐服务（RAG + PydanticOutputParser）
+│   │   ├── recommend.py     # 推荐服务（RAG + PydanticOutputParser）
+│   │   └── error.py         # 决策树推进、语言坑检测、统计口径
 │   ├── rag/
 │   │   ├── vector_store.py  # FAISS 向量库（持久化 + 增删改）
 │   │   └── retriever.py     # 数据库 <-> 向量库同步、语义检索
@@ -96,6 +99,16 @@ python main.py
 - `GET /api/chat/sessions/{id}/messages` - 查看某次会话的全部消息
 - `DELETE /api/chat/sessions/{id}` - 删除会话
 
+### 错因分类
+
+- `GET /api/errors/meta` - 六类错因、子标签、决策树、预置映射（`?topic=链表` 可过滤）
+- `POST /api/errors/decide` - 传决策树回答数组推导错因（body: `{answers, specific_behavior}`）
+- `GET /api/errors` - 归因记录（支持 `problem_id` / `error_type` / `reviewed` 过滤）
+- `POST /api/errors` - 创建归因（DECOMPOSE 必须带拆解句，否则 422）
+- `PUT /api/errors/{id}` - 更新复盘状态 / 补救动作 / 备注
+- `DELETE /api/errors/{id}` - 删除记录
+- `GET /api/errors/statistics` - 统计（`practice_mode=false` 才解锁正确率等模拟指标）
+
 ## 核心功能
 
 ### 1. RAG 语义检索
@@ -119,6 +132,15 @@ python main.py
 ### 4. 多轮对话记忆
 
 自定义 `DBMessageHistory` 实现 LangChain 的 `BaseChatMessageHistory` 接口，消息落到 `chat_sessions` / `chat_messages` 两张表。取最近 20 条作为上下文窗口，支持「刚才那道题」这类指代追问，服务重启不丢会话。
+
+### 5. 错因分类
+
+六类错因按「最早断掉的一环」互斥（READ → IDENTIFY → DECOMPOSE → OPERATE → BOUNDARY → EFFICIENCY），归因入口是决策树问答而不是下拉框，避免自评全选「操作错」。
+
+- `specificBehavior` 强制非空且 ≤50 字；写不出说明还没归因清楚
+- DECOMPOSE 类强制写拆解句，且必须同时含「=」「母题」「改」
+- OPERATE 且命中语言坑关键词（`->`、`nullptr`、`size_t`、`segfault`、空指针、越界、未初始化）时提示补打 SYNTAX 标签
+- 练习阶段只报四个指标：错因分布、识别平均耗时、拆解句覆盖率、待补错因数；正确率等模拟指标需显式切换模式才解锁
 
 ## 开发计划
 

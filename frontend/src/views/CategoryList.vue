@@ -4,7 +4,10 @@
       <template #header>
         <div style="display: flex; justify-content: space-between; align-items: center">
           <span style="font-size: 18px; font-weight: bold">知识点列表</span>
-          <el-button type="primary" @click="showAddDialog = true">新建知识点</el-button>
+          <div>
+            <el-button @click="router.push('/errors')">错因统计</el-button>
+            <el-button type="primary" @click="showAddDialog = true">新建知识点</el-button>
+          </div>
         </div>
       </template>
 

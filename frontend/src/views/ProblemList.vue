@@ -44,9 +44,10 @@
             <el-tag :type="scope.row.status === 'done' ? 'success' : 'info'">{{ scope.row.status }}</el-tag>
           </template>
         </el-table-column>
-        <el-table-column label="操作" width="200">
+        <el-table-column label="操作" width="300">
           <template #default="scope">
             <el-button type="success" size="small" @click="recommendFn(scope.row)">AI 推荐</el-button>
+            <el-button type="warning" size="small" @click="goErrorAnalysis(scope.row)">错因归因</el-button>
             <el-button type="danger" size="small" @click="deleteProblemFn(scope.row.id)">删除</el-button>
           </template>
         </el-table-column>
@@ -160,6 +161,10 @@ const clearSearch = () => {
   searchQuery.value = ''
   searchMode.value = false
   loadProblems()
+}
+
+const goErrorAnalysis = (problem) => {
+  router.push({ path: '/errors', query: { problem_id: problem.id } })
 }
 
 const addProblem = async () => {

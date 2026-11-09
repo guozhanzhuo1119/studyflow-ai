@@ -3,6 +3,7 @@ import Login from '../views/Login.vue'
 import CategoryList from '../views/CategoryList.vue'
 import ProblemList from '../views/ProblemList.vue'
 import Chat from '../views/Chat.vue'
+import ErrorAnalysis from '../views/ErrorAnalysis.vue'
 
 const routes = [
   {
@@ -27,6 +28,12 @@ const routes = [
     path: '/chat',
     name: 'Chat',
     component: Chat,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/errors',
+    name: 'Errors',
+    component: ErrorAnalysis,
     meta: { requiresAuth: true }
   }
 ]
