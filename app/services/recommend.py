@@ -87,7 +87,7 @@ def _build_retrieval_context(problem, category) -> str:
     for i, item in enumerate(similar, 1):
         lines.append(
             f"{i}. {item.get('title')}（来源：{item.get('source') or '未知'}，"
-            f"难度：{item.get('difficulty') or '未知'}，相似度：{item.get('score')}）"
+            f"相似度：{item.get('score')}）"
         )
     return '\n'.join(lines)
 
@@ -106,7 +106,6 @@ def recommend_variants(problem, category, count: int = 5) -> List[Dict]:
         'title': problem.title,
         'category': category.name if category else '未知',
         'source': problem.source or '未知',
-        'difficulty': problem.difficulty or '未知',
         'tags': problem.tags or '无',
         'count': count,
         'retrieval_context': _build_retrieval_context(problem, category),

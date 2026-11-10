@@ -2,19 +2,19 @@
 把工具交给模型，由模型自己决定调用哪个（Function Calling），而不是在代码里写 if-else
 """
 
-import logging
+import logging# 日志
 from typing import List
 
-from langchain.agents import create_agent
-from langchain_core.messages import BaseMessage, HumanMessage
+from langchain.agents import create_agent#langchain框架提供的创建智能体的api
+from langchain_core.messages import BaseMessage, HumanMessage#langchain框架提供的消息类
 
-from app.agent.tools import analyze_weak_points, recommend_variants, search_problems
-from app.services.llm import get_llm
+from app.agent.tools import analyze_weak_points, recommend_variants, search_problems#导入tool工具
+from app.services.llm import get_llm#获取语言模型deepseek
 
 logger = logging.getLogger(__name__)
 
 TOOLS = [search_problems, analyze_weak_points, recommend_variants]
-
+#提示词，把这段自然语言嵌入代码里面替代if-else
 SYSTEM_PROMPT = """你是 StudyFlow AI 的智能学习助手，服务正在备考考研数学、刷算法题的学生。
 
 你可以调用以下工具：
@@ -33,7 +33,7 @@ SYSTEM_PROMPT = """你是 StudyFlow AI 的智能学习助手，服务正在备�
 
 _agent = None
 
-
+#这个函数是创建智能体的，全局的，只建立一次
 def get_agent():
     """Agent 构建成本较高，进程内复用"""
     global _agent
@@ -45,7 +45,7 @@ def get_agent():
         )
     return _agent
 
-
+#这个函数是把消息内容提取出来的，兼容字符串和分段列表两种返回格式
 def _extract_text(message: BaseMessage) -> str:
     """兼容 content 为字符串或分段列表两种返回格式"""
     content = message.content
@@ -61,7 +61,7 @@ def _extract_text(message: BaseMessage) -> str:
         return ''.join(parts)
     return str(content)
 
-
+#这个函数是调用智能体的，传入消息和历史消息，返回智能体的回复
 def run_agent(message: str, history: List[BaseMessage] | None = None) -> str:
     """带上下文的对话：历史消息来自数据库，本次消息单独传入"""
     messages: List[BaseMessage] = list(history or [])

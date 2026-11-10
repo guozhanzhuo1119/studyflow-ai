@@ -117,7 +117,6 @@ class VectorStore:
             problem.get('title') or '',
             problem.get('category_name') or '',
             problem.get('tags') or '',
-            problem.get('content') or '',
         ]
         return ' '.join(p for p in parts if p).strip()
 
@@ -157,7 +156,7 @@ class VectorStore:
         """只保留可以 JSON 序列化的字段"""
         return {
             k: item.get(k)
-            for k in ('id', 'title', 'content', 'source', 'difficulty', 'tags',
+            for k in ('id', 'title', 'source', 'tags',
                       'category_id', 'category_name', 'status')
         }
 
@@ -192,7 +191,7 @@ class VectorStore:
     @staticmethod
     def _signature(item: Dict) -> tuple:
         """用于判断元数据是否发生变化，变了才重新 embedding"""
-        return tuple(item.get(k) or '' for k in ('title', 'content', 'tags', 'category_name'))
+        return tuple(item.get(k) or '' for k in ('title', 'tags', 'category_name'))
 
     def sync(self, items: List[Dict]) -> Dict[str, int]:
         """把数据库中的题目与索引对齐：补新增、删多余、刷改动"""

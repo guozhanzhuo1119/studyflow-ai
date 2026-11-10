@@ -33,11 +33,6 @@
       <el-table :data="problems" stripe style="width: 100%">
         <el-table-column prop="title" label="标题" />
         <el-table-column v-if="searchMode" prop="score" label="相似度" width="100" />
-        <el-table-column prop="difficulty" label="难度" width="100">
-          <template #default="scope">
-            <el-tag :type="getDifficultyType(scope.row.difficulty)">{{ scope.row.difficulty }}</el-tag>
-          </template>
-        </el-table-column>
         <el-table-column prop="source" label="来源" width="120" />
         <el-table-column prop="status" label="状态" width="100">
           <template #default="scope">
@@ -60,18 +55,8 @@
         <el-form-item label="标题">
           <el-input v-model="newProblem.title" placeholder="题目名称" />
         </el-form-item>
-        <el-form-item label="内容">
-          <el-input v-model="newProblem.content" type="textarea" :rows="4" placeholder="题目内容" />
-        </el-form-item>
         <el-form-item label="来源">
           <el-input v-model="newProblem.source" placeholder="例如：考研真题" />
-        </el-form-item>
-        <el-form-item label="难度">
-          <el-select v-model="newProblem.difficulty" style="width: 100%">
-            <el-option label="简单" value="easy" />
-            <el-option label="中等" value="medium" />
-            <el-option label="困难" value="hard" />
-          </el-select>
         </el-form-item>
         <el-form-item label="标签">
           <el-input v-model="newProblem.tags" placeholder="用逗号分隔" />
@@ -119,9 +104,7 @@ const showRecommendDialog = ref(false)
 const recommendations = ref([])
 const newProblem = ref({
   title: '',
-  content: '',
   source: '',
-  difficulty: 'medium',
   tags: '',
   category_id: route.params.id
 })
@@ -176,7 +159,7 @@ const addProblem = async () => {
     await createProblem(newProblem.value)
     ElMessage.success('创建成功')
     showAddDialog.value = false
-    newProblem.value = { title: '', content: '', source: '', difficulty: 'medium', tags: '', category_id: route.params.id }
+    newProblem.value = { title: '', source: '', tags: '', category_id: route.params.id }
     loadProblems()
   } catch (error) {
     ElMessage.error('创建失败')

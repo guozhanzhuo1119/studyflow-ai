@@ -14,9 +14,7 @@ logger = logging.getLogger(__name__)
 
 class ProblemCreate(BaseModel):
     title: str
-    content: str | None = None
     source: str | None = None
-    difficulty: str | None = None
     tags: str | None = None
     category_id: str
 
@@ -45,9 +43,7 @@ def create_problem(data: ProblemCreate, db: Session = Depends(get_db)):
     problem = Problem(
         id=f'prob-{uuid.uuid4().hex[:8]}',
         title=data.title,
-        content=data.content,
         source=data.source,
-        difficulty=data.difficulty,
         tags=data.tags,
         category_id=data.category_id,
         status='todo',
@@ -73,9 +69,7 @@ def update_problem(problem_id: str, data: ProblemCreate, db: Session = Depends(g
         raise HTTPException(404, '题目不存在')
 
     problem.title = data.title
-    problem.content = data.content
     problem.source = data.source
-    problem.difficulty = data.difficulty
     problem.tags = data.tags
     problem.category_id = data.category_id
 

@@ -20,7 +20,7 @@ def _difficulty_label(value: str | None) -> str:
 def _format_problem(item: Dict, index: int) -> str:
     line = (
         f"{index}. {item.get('title')}（知识点：{item.get('category_name') or '未知'}，"
-        f"难度：{_difficulty_label(item.get('difficulty'))}，来源：{item.get('source') or '未知'}"
+        f"来源：{item.get('source') or '未知'}"
     )
     if item.get('score') is not None:
         line += f"，相似度：{item['score']}"
