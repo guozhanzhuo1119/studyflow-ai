@@ -46,9 +46,8 @@ SYSTEM_PROMPT = "你是一个刷题变体推荐助手，精通考研数学与算
 
 HUMAN_PROMPT = """母题信息：
 - 题目：{title}
-- 知识点：{category}
+- 层级：{hierarchy}
 - 来源：{source}
-- 难度：{difficulty}
 - 标签：{tags}
 
 {retrieval_context}
@@ -67,18 +66,31 @@ EXAM_STYLE_HINT = '优先推荐历年真题或知名辅导书（张宇、李永�
 DEFAULT_STYLE_HINT = '题目描述要清晰，说明考查什么知识点或模板。'
 
 
-def _is_exam_style(problem, category) -> bool:
+def _hierarchy_text(hierarchy: Dict[str, str] | None) -> str:
+    """把科目 / 章节 / 知识点拼成一行可读文本"""
+    if not hierarchy:
+        return ''
+    names = (
+        hierarchy.get('subject_name'),
+        hierarchy.get('chapter_name'),
+        hierarchy.get('knowledge_point_name'),
+    )
+    return ' / '.join(name for name in names if name)
+
+
+def _is_exam_style(problem, hierarchy) -> bool:
     source = (getattr(problem, 'source', '') or '').lower()
-    category_name = (category.name if category else '').lower()
+    hierarchy_name = _hierarchy_text(hierarchy).lower()
     keywords = ['考研', '真题', '张宇', '李永乐', '汤家凤', '数学']
-    return any(k in source or k in category_name for k in keywords)
+    return any(k in source or k in hierarchy_name for k in keywords)
 
 
-def _build_retrieval_context(problem, category) -> str:
+def _build_retrieval_context(problem, hierarchy) -> str:
     """RAG：从题库里检索相似题，作为推荐时的上下文"""
     query_parts = [problem.title or '', getattr(problem, 'tags', '') or '']
-    if category:
-        query_parts.append(category.name)
+    hierarchy_text = _hierarchy_text(hierarchy)
+    if hierarchy_text:
+        query_parts.append(hierarchy_text)
     similar = semantic_search(' '.join(p for p in query_parts if p), top_k=3, exclude_ids=[problem.id])
     if not similar:
         return '题库中暂无相似题目。'
@@ -100,16 +112,16 @@ def _invoke_chain(payload: Dict) -> RecommendationList:
     return chain.invoke(payload)
 
 
-def recommend_variants(problem, category, count: int = 5) -> List[Dict]:
+def recommend_variants(problem, hierarchy: Dict[str, str] | None = None, count: int = 5) -> List[Dict]:
     """根据母题推荐变体题，返回稳定的结构化列表"""
     payload = {
         'title': problem.title,
-        'category': category.name if category else '未知',
+        'hierarchy': _hierarchy_text(hierarchy) or '未知',
         'source': problem.source or '未知',
         'tags': problem.tags or '无',
         'count': count,
-        'retrieval_context': _build_retrieval_context(problem, category),
-        'style_hint': EXAM_STYLE_HINT if _is_exam_style(problem, category) else DEFAULT_STYLE_HINT,
+        'retrieval_context': _build_retrieval_context(problem, hierarchy),
+        'style_hint': EXAM_STYLE_HINT if _is_exam_style(problem, hierarchy) else DEFAULT_STYLE_HINT,
         'format_instructions': parser.get_format_instructions(),
     }
 

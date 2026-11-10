@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app import get_db
-from app.models.problem import Problem, Category
+from app.models.problem import Problem
 from app.services.recommend import recommend_variants
 from pydantic import BaseModel
 
@@ -26,13 +26,25 @@ def recommend(request: RecommendRequest, db: Session = Depends(get_db)):
     if not problem:
         raise HTTPException(404, '题目不存在')
 
-    # 2. 查询所属知识点
-    category = db.query(Category).filter(Category.id == problem.category_id).first()
+    # 2. 沿 知识点 -> 章节 -> 科目 取层级名称
+    hierarchy = {
+        'knowledge_point_name': None,
+        'chapter_name': None,
+        'subject_name': None,
+    }
+    kp = problem.knowledge_point
+    if kp:
+        hierarchy['knowledge_point_name'] = kp.name
+        chapter = kp.chapter
+        if chapter:
+            hierarchy['chapter_name'] = chapter.name
+            if chapter.subject:
+                hierarchy['subject_name'] = chapter.subject.name
 
     # 3. 调用 AI 推荐
     recommendations = recommend_variants(
         problem=problem,
-        category=category,
+        hierarchy=hierarchy,
         count=request.count
     )
 

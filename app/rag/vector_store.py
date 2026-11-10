@@ -115,7 +115,9 @@ class VectorStore:
         """拼出用于 embedding 的文本，标题权重最高放最前面"""
         parts = [
             problem.get('title') or '',
-            problem.get('category_name') or '',
+            problem.get('subject_name') or '',
+            problem.get('chapter_name') or '',
+            problem.get('knowledge_point_name') or '',
             problem.get('tags') or '',
         ]
         return ' '.join(p for p in parts if p).strip()
@@ -157,7 +159,8 @@ class VectorStore:
         return {
             k: item.get(k)
             for k in ('id', 'title', 'source', 'tags',
-                      'category_id', 'category_name', 'status')
+                      'knowledge_point_id', 'knowledge_point_name',
+                      'chapter_name', 'subject_name', 'status')
         }
 
     def update(self, item: Dict, save: bool = True) -> int:
@@ -191,7 +194,10 @@ class VectorStore:
     @staticmethod
     def _signature(item: Dict) -> tuple:
         """用于判断元数据是否发生变化，变了才重新 embedding"""
-        return tuple(item.get(k) or '' for k in ('title', 'tags', 'category_name'))
+        return tuple(
+            item.get(k) or ''
+            for k in ('title', 'tags', 'knowledge_point_name', 'chapter_name', 'subject_name')
+        )
 
     def sync(self, items: List[Dict]) -> Dict[str, int]:
         """把数据库中的题目与索引对齐：补新增、删多余、刷改动"""

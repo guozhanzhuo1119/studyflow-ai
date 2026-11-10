@@ -8,7 +8,10 @@ from app.models.problem import Base as ProblemBase
 from app.models.user import Base as UserBase
 from app.models.chat import Base as ChatBase
 from app.models.error import Base as ErrorBase
-from app.routers import categories, problems, recommend, chat, auth, error
+from app.routers import (
+    subjects, chapters, knowledge_points, problems,
+    variants, recommend, chat, auth, error,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -50,8 +53,11 @@ app.add_middleware(
 
 # 注册路由
 app.include_router(auth.router)
-app.include_router(categories.router)
+app.include_router(subjects.router)
+app.include_router(chapters.router)
+app.include_router(knowledge_points.router)
 app.include_router(problems.router)
+app.include_router(variants.router)
 app.include_router(recommend.router)
 app.include_router(chat.router)
 app.include_router(error.router)

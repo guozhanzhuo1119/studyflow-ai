@@ -5,7 +5,7 @@ from typing import Dict, List
 from langchain_core.tools import tool
 
 from app import SessionLocal
-from app.models.problem import Category, Problem
+from app.models.problem import Chapter, KnowledgePoint, Problem, Subject
 from app.rag.retriever import semantic_search
 from app.services.llm import get_llm
 from app.services.recommend import recommend_variants as recommend_variants_service
@@ -17,9 +17,18 @@ def _difficulty_label(value: str | None) -> str:
     return DIFFICULTY_LABELS.get((value or '').lower(), value or '未知')
 
 
+def _path_text(kp_name: str | None, chapter_name: str | None, subject_name: str | None) -> str:
+    return ' / '.join(name for name in (subject_name, chapter_name, kp_name) if name) or '未归类'
+
+
 def _format_problem(item: Dict, index: int) -> str:
+    path = _path_text(
+        item.get('knowledge_point_name'),
+        item.get('chapter_name'),
+        item.get('subject_name'),
+    )
     line = (
-        f"{index}. {item.get('title')}（知识点：{item.get('category_name') or '未知'}，"
+        f"{index}. {item.get('title')}（层级：{path}，"
         f"来源：{item.get('source') or '未知'}"
     )
     if item.get('score') is not None:
@@ -32,8 +41,10 @@ def analyze_weak_points() -> str:
     """分析用户当前题库的做题情况，找出掌握薄弱的知识点并给出复习建议。当用户问「我的弱项是什么」「该补哪里」「学习情况怎么样」时调用。"""
     with SessionLocal() as db:
         rows = (
-            db.query(Problem, Category.name)
-            .outerjoin(Category, Problem.category_id == Category.id)
+            db.query(Problem, KnowledgePoint.name, Chapter.name, Subject.name)
+            .join(KnowledgePoint, Problem.knowledge_point_id == KnowledgePoint.id)
+            .outerjoin(Chapter, KnowledgePoint.chapter_id == Chapter.id)
+            .outerjoin(Subject, Chapter.subject_id == Subject.id)
             .all()
         )
         if not rows:
@@ -41,8 +52,8 @@ def analyze_weak_points() -> str:
 
         stats: Dict[str, Dict[str, int]] = {}
         done_titles: List[str] = []
-        for problem, category_name in rows:
-            name = category_name or '未分类'
+        for problem, kp_name, chapter_name, subject_name in rows:
+            name = _path_text(kp_name, chapter_name, subject_name)
             bucket = stats.setdefault(name, {'total': 0, 'done': 0})
             bucket['total'] += 1
             if (problem.status or '') == 'done':
@@ -102,13 +113,23 @@ def recommend_variants(problem_title: str, count: int = 3) -> str:
         if not problem:
             return f'题库中没有找到与「{problem_title}」相关的母题，请先确认题目是否已录入。'
 
-        category = None
-        if problem.category_id:
-            category = db.query(Category).filter(Category.id == problem.category_id).first()
+        hierarchy = {
+            'knowledge_point_name': None,
+            'chapter_name': None,
+            'subject_name': None,
+        }
+        kp = problem.knowledge_point
+        if kp:
+            hierarchy['knowledge_point_name'] = kp.name
+            chapter = kp.chapter
+            if chapter:
+                hierarchy['chapter_name'] = chapter.name
+                if chapter.subject:
+                    hierarchy['subject_name'] = chapter.subject.name
 
         items: List[Dict] = recommend_variants_service(
             problem=problem,
-            category=category,
+            hierarchy=hierarchy,
             count=min(max(count, 1), 8),
         )
 

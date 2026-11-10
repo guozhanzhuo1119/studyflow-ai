@@ -1,7 +1,10 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import Login from '../views/Login.vue'
-import CategoryList from '../views/CategoryList.vue'
+import SubjectList from '../views/SubjectList.vue'
+import ChapterList from '../views/ChapterList.vue'
+import KnowledgePointList from '../views/KnowledgePointList.vue'
 import ProblemList from '../views/ProblemList.vue'
+import VariantList from '../views/VariantList.vue'
 import Chat from '../views/Chat.vue'
 import ErrorAnalysis from '../views/ErrorAnalysis.vue'
 
@@ -13,15 +16,32 @@ const routes = [
   },
   {
     path: '/',
-    name: 'Categories',
-    component: CategoryList,
+    name: 'Subjects',
+    component: SubjectList,
     meta: { requiresAuth: true }
   },
   {
-    path: '/categories/:id',
+    path: '/subjects/:subjectId',
+    name: 'Chapters',
+    component: ChapterList,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/chapters/:chapterId',
+    name: 'KnowledgePoints',
+    component: KnowledgePointList,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/knowledge-points/:kpId',
     name: 'Problems',
     component: ProblemList,
-    props: true,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/problems/:problemId/variants',
+    name: 'Variants',
+    component: VariantList,
     meta: { requiresAuth: true }
   },
   {

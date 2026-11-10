@@ -28,16 +28,46 @@ api.interceptors.response.use(
   }
 )
 
-// 知识点
-export const getCategories = () => api.get('/categories')
-export const createCategory = (data) => api.post('/categories', data)
+// 科目
+export const getSubjects = () => api.get('/subjects')
+export const getSubject = (id) => api.get(`/subjects/${id}`)
+export const createSubject = (data) => api.post('/subjects', data)
+export const updateSubject = (id, data) => api.put(`/subjects/${id}`, data)
+export const deleteSubject = (id) => api.delete(`/subjects/${id}`)
 
-// 题目
-export const getProblems = (categoryId) => api.get('/problems', { params: { category_id: categoryId } })
+// 章节
+export const getChapters = (subjectId) => api.get('/chapters', { params: { subject_id: subjectId } })
+export const getChapter = (id) => api.get(`/chapters/${id}`)
+export const createChapter = (data) => api.post('/chapters', data)
+export const updateChapter = (id, data) => api.put(`/chapters/${id}`, data)
+export const deleteChapter = (id) => api.delete(`/chapters/${id}`)
+
+// 知识点
+export const getKnowledgePoints = (chapterId) =>
+  api.get('/knowledge-points', { params: { chapter_id: chapterId } })
+export const getKnowledgePoint = (id) => api.get(`/knowledge-points/${id}`)
+export const createKnowledgePoint = (data) => api.post('/knowledge-points', data)
+export const updateKnowledgePoint = (id, data) => api.put(`/knowledge-points/${id}`, data)
+export const deleteKnowledgePoint = (id) => api.delete(`/knowledge-points/${id}`)
+
+// 题目（母题）
+export const getProblems = (knowledgePointId) =>
+  api.get('/problems', { params: { knowledge_point_id: knowledgePointId } })
+export const getProblem = (id) => api.get(`/problems/${id}`)
 export const createProblem = (data) => api.post('/problems', data)
 export const updateProblem = (id, data) => api.put(`/problems/${id}`, data)
 export const deleteProblem = (id) => api.delete(`/problems/${id}`)
 export const searchProblems = (query, topK = 5) => api.post('/problems/search', { query, top_k: topK })
+export const importProblems = (knowledgePointId, items) =>
+  api.post('/problems/import', { knowledge_point_id: knowledgePointId, items })
+
+// 变题
+export const getVariants = (problemId) => api.get('/variants', { params: { problem_id: problemId } })
+export const createVariant = (data) => api.post('/variants', data)
+export const saveVariantsFromRecommendation = (problemId, recommendations) =>
+  api.post('/variants/from-recommendation', { problem_id: problemId, recommendations })
+export const updateVariant = (id, data) => api.put(`/variants/${id}`, data)
+export const deleteVariant = (id) => api.delete(`/variants/${id}`)
 
 // AI 推荐
 export const recommend = (problemId, count = 5) => api.post('/recommend', { problem_id: problemId, count })
