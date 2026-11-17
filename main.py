@@ -12,9 +12,11 @@ from app.models.chat import Base as ChatBase
 from app.models.error import Base as ErrorBase
 from app.models.attempt import Base as AttemptBase
 from app.models.material import Base as MaterialBase
+from app.models.wrong_book import Base as WrongBookBase
 from app.routers import (
     subjects, chapters, knowledge_points, problems,
     variants, recommend, chat, auth, error, uploads, attempts, materials,
+    wrong_book,
 )
 
 logger = logging.getLogger(__name__)
@@ -29,6 +31,7 @@ async def lifespan(app: FastAPI):
     ErrorBase.metadata.create_all(bind=engine)
     AttemptBase.metadata.create_all(bind=engine)
     MaterialBase.metadata.create_all(bind=engine)
+    WrongBookBase.metadata.create_all(bind=engine)
 
     # 把数据库中的题目同步进 FAISS，保证语义检索可用
     from app.rag.retriever import sync_all_problems
@@ -70,6 +73,7 @@ app.include_router(error.router)
 app.include_router(uploads.router)
 app.include_router(attempts.router)
 app.include_router(materials.router)
+app.include_router(wrong_book.router)
 
 # 挂载 uploads/ 目录为静态资源，Markdown 里 ![](/uploads/xxx.png) 可直接渲染
 _uploads_dir = Path(__file__).resolve().parent / 'uploads'

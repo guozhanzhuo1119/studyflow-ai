@@ -8,6 +8,7 @@
         <el-menu mode="horizontal" :ellipsis="false" style="background: transparent; border: none" router>
           <el-menu-item index="/">科目</el-menu-item>
           <el-menu-item index="/materials">知识库</el-menu-item>
+          <el-menu-item index="/wrong-book">错题本</el-menu-item>
           <el-menu-item index="/chat">AI 助手</el-menu-item>
         </el-menu>
       </div>

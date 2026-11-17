@@ -164,6 +164,13 @@ npm run dev
 - `DELETE /api/errors/{id}` - 删除记录
 - `GET /api/errors/statistics` - 统计（`practice_mode=false` 才解锁正确率等模拟指标）
 
+### 作答与错题本
+
+- `POST /api/attempts` - 记录一次作答；带 `user_answers`（选项字母数组）时由服务端判分，响应包含 `correct_answer` / `explanation`
+- `GET /api/attempts/overview` - 按题目聚合作答次数（支持 `knowledge_point_id` / `problem_id`）
+- `GET /api/attempts/{target_type}/{target_id}` - 某道题的全部作答历史
+- `GET /api/wrong-book` - 错题本（`?mastered=false` 只看未掌握、`true` 只看已掌握；`target_type=problem` 可过滤类型）
+
 ## 核心功能
 
 ### 1. 五层题目结构
@@ -228,6 +235,8 @@ npm run dev
 - **出题校验与入库**：逐题检查四选项齐全、答案属于 A/B/C/D、题干 ≥8 字、解析 ≥20 字，并按「同章节归一化标题」去重（含本章已有题目）；不合格题丢弃并计入 `dropped`。全部校验通过后才在一个事务里批量插入 `problems` 并复用/新建知识点，模型异常或全部不合格时直接报错、不写库；LLM 侧超时 120 秒，超时返回 504。
 - **答案侧数据不下发**：`problems.type/options/answer/explanation/difficulty` 为 L2 新增列，`options` 以 JSON 文本存储；列表与详情接口只返回 `type/options/difficulty`，`answer` 和 `explanation` 仅留在库内，避免刷题页直接看到答案。
 - **一次性补列脚本**：`create_all` 不会给已有表加列，升级已有库需执行一次 `python scripts/alter_problems_l2.py`（可重复执行，已存在的列会跳过）。
+- **判分规则（L3）**：`POST /api/attempts` 的 body 可只传 `user_answers: ["A"]`，服务端把用户选项集合与 `problems.answer` 的字母集合做「完全相等」比较（统一转大写、忽略 `A.` 这类前缀），自动得出 `correct/wrong`；响应额外返回 `correct_answer` 与 `explanation`。答案与解析只在该提交响应里出现，题目列表/详情依旧不下发。
+- **错题本（L3）**：`wrong_book` 表以 `(target_type, target_id)` 为唯一键，同题只保留一行；答错 `wrong_count+1` 并把 `mastered` 复位为 `false`，答对只把已有记录标记 `mastered=true`（不删记录），放弃作答不影响错题本。作答记录、错因归因与错题本在同一个事务内提交，唯一键冲突会回滚并返回 409。表由启动时的 `create_all` 自动创建，无需 ALTER。
 
 ## License
 

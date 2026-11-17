@@ -7,6 +7,7 @@ import ProblemList from '../views/ProblemList.vue'
 import VariantList from '../views/VariantList.vue'
 import Chat from '../views/Chat.vue'
 import ErrorAnalysis from '../views/ErrorAnalysis.vue'
+import WrongBook from '../views/WrongBook.vue'
 import KnowledgeBase from '../views/KnowledgeBase.vue'
 
 const routes = [
@@ -55,6 +56,12 @@ const routes = [
     path: '/errors',
     name: 'Errors',
     component: ErrorAnalysis,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/wrong-book',
+    name: 'WrongBook',
+    component: WrongBook,
     meta: { requiresAuth: true }
   },
   {

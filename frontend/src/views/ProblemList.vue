@@ -119,6 +119,35 @@
           {{ optionLabel(index) }}. {{ text }}
         </div>
       </div>
+      <div v-if="detailData.options && detailData.options.length" class="answer-block">
+        <div class="answer-label">选择答案后提交，由服务端按标准答案判分</div>
+        <div class="answer-actions">
+          <el-radio-group v-model="choiceAnswer" :disabled="!!choiceResult">
+            <el-radio v-for="(text, index) in detailData.options" :key="index" :label="optionLabel(index)">
+              {{ optionLabel(index) }}
+            </el-radio>
+          </el-radio-group>
+          <el-button
+            type="primary"
+            size="small"
+            :loading="submittingAnswer"
+            :disabled="!choiceAnswer || !!choiceResult"
+            @click="submitChoice"
+          >
+            提交答案
+          </el-button>
+        </div>
+        <el-alert
+          v-if="choiceResult"
+          :closable="false"
+          style="margin-top: 10px"
+          :type="choiceResult.result === 'correct' ? 'success' : 'error'"
+          :title="choiceResult.result === 'correct' ? '回答正确，已标记为掌握' : '回答错误，已记入错题本'"
+        >
+          <div>正确答案：{{ choiceResult.correct_answer }}</div>
+          <div>解析：{{ choiceResult.explanation || '暂无解析' }}</div>
+        </el-alert>
+      </div>
       <div v-if="!detailData.content && !(detailData.options && detailData.options.length)" style="color: #909399; text-align: center; padding: 20px">
         暂无正文，点击编辑按钮填写
       </div>
@@ -245,6 +274,9 @@ const saving = ref(false)
 
 const showDetail = ref(false)
 const detailData = ref({})
+const choiceAnswer = ref('')
+const choiceResult = ref(null)
+const submittingAnswer = ref(false)
 
 const searchQuery = ref('')
 const searching = ref(false)
@@ -414,6 +446,7 @@ const openEdit = (row) => {
 
 const showDetailDialog = (row) => {
   detailData.value = {
+    id: row.id,
     title: row.title,
     content: row.content || '',
     options: row.options || [],
@@ -421,7 +454,32 @@ const showDetailDialog = (row) => {
     source: row.source,
     tags: row.tags
   }
+  choiceAnswer.value = ''
+  choiceResult.value = null
   showDetail.value = true
+}
+
+const submitChoice = async () => {
+  submittingAnswer.value = true
+  try {
+    const res = await createAttempt({
+      target_type: 'problem',
+      target_id: detailData.value.id,
+      user_answers: [choiceAnswer.value],
+      source: 'ai'
+    })
+    choiceResult.value = res.data
+    attemptStats.value = { ...attemptStats.value, [detailData.value.id]: res.data.stats }
+    if (res.data.result === 'correct') {
+      ElMessage.success('回答正确')
+    } else {
+      ElMessage.error('回答错误，已加入错题本')
+    }
+  } catch (error) {
+    ElMessage.error(error.response?.data?.detail || '提交失败，请稍后重试')
+  } finally {
+    submittingAnswer.value = false
+  }
 }
 
 const optionLabel = (index) => ['A', 'B', 'C', 'D'][index] || String(index + 1)
@@ -601,6 +659,21 @@ const goBack = () => {
 }
 .detail-option {
   padding: 2px 0;
+}
+.answer-block {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px dashed #e4e7ed;
+}
+.answer-label {
+  color: #909399;
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+.answer-actions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 .recommend-item {
   border: 1px solid #ebeef5;

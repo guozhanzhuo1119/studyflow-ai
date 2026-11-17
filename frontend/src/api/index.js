@@ -93,6 +93,8 @@ export const getSessions = () => api.get('/chat/sessions')
 export const getSessionMessages = (sessionId) => api.get(`/chat/sessions/${sessionId}/messages`)
 export const createAttempt = (data) => api.post('/attempts', data)
 export const getAttemptOverview = (params) => api.get('/attempts/overview', { params })
+// 错题本：mastered 传 true/false，不传查全部
+export const getWrongBook = (params = {}) => api.get('/wrong-book', { params })
 export const deleteSession = (sessionId) => api.delete(`/chat/sessions/${sessionId}`)
 
 // 认证
