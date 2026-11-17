@@ -87,8 +87,8 @@ export const getErrorStatistics = (practiceMode = true) =>
   api.get('/errors/statistics', { params: { practice_mode: practiceMode } })
 
 // AI 对话
-export const chat = (message, sessionId = null, subjectId = null) =>
-  api.post('/chat', { message, session_id: sessionId, subject_id: subjectId })
+export const chat = (message, sessionId = null, subjectId = null, questionId = null) =>
+  api.post('/chat', { message, session_id: sessionId, subject_id: subjectId, question_id: questionId })
 export const getSessions = () => api.get('/chat/sessions')
 export const getSessionMessages = (sessionId) => api.get(`/chat/sessions/${sessionId}/messages`)
 export const createAttempt = (data) => api.post('/attempts', data)

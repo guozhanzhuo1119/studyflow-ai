@@ -149,7 +149,7 @@ npm run dev
 - `POST /api/recommend` - 根据母题推荐变体题（body: `{problem_id, count}`，RAG 检索 + 结构化输出）
 
 ### AI 对话
-- `POST /api/chat` - 多轮对话（Agent 自动选择工具，历史存库）
+- `POST /api/chat` - 多轮对话（Agent 自动选择工具，历史存库）；可带 `question_id`，服务端注入当前题干/选项/答案/解析/最近作答
 - `GET /api/chat/sessions` - 列出所有会话
 - `GET /api/chat/sessions/{id}/messages` - 查看某次会话的全部消息
 - `DELETE /api/chat/sessions/{id}` - 删除会话
@@ -237,6 +237,7 @@ npm run dev
 - **一次性补列脚本**：`create_all` 不会给已有表加列，升级已有库需执行一次 `python scripts/alter_problems_l2.py`（可重复执行，已存在的列会跳过）。
 - **判分规则（L3）**：`POST /api/attempts` 的 body 可只传 `user_answers: ["A"]`，服务端把用户选项集合与 `problems.answer` 的字母集合做「完全相等」比较（统一转大写、忽略 `A.` 这类前缀），自动得出 `correct/wrong`；响应额外返回 `correct_answer` 与 `explanation`。答案与解析只在该提交响应里出现，题目列表/详情依旧不下发。
 - **错题本（L3）**：`wrong_book` 表以 `(target_type, target_id)` 为唯一键，同题只保留一行；答错 `wrong_count+1` 并把 `mastered` 复位为 `false`，答对只把已有记录标记 `mastered=true`（不删记录），放弃作答不影响错题本。作答记录、错因归因与错题本在同一个事务内提交，唯一键冲突会回滚并返回 409。表由启动时的 `create_all` 自动创建，无需 ALTER。
+- **心月狐陪练（L4）**：`POST /api/chat` 的 body 可带 `question_id`，服务端把题干、四个选项、正确答案、解析、最近一次作答拼成 `【当前题目】` 前缀追加到本次用户消息（不落库、不下发前端），Agent 工具与人设均未改动，人设只通过 `SYSTEM_PROMPT` 实现（温柔的狐耳陪练、焦虑先共情、先思路后答案、回复不超过 150 字、不编造、全程中文）。`question_id` 不存在时返回 404。前端题目详情「问心月狐」跳转 `/chat?question_id=…`，聊天页顶部显示当前题目并在后续消息中持续携带。
 
 ## License
 

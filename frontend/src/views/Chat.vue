@@ -14,6 +14,18 @@
         </div>
       </template>
 
+      <!-- 从题目详情带进来的题目上下文 -->
+      <el-alert
+        v-if="questionId"
+        type="info"
+        show-icon
+        closable
+        style="margin-bottom: 10px"
+        @close="clearQuestion"
+      >
+        <template #title>正在围绕题目提问：{{ questionTitle || questionId }}</template>
+      </el-alert>
+
       <!-- 聊天消息列表 -->
       <div ref="chatContainer" style="height: 500px; overflow-y: auto; padding: 20px; background: #f5f5f5">
         <div v-for="(msg, index) in messages" :key="index" style="margin-bottom: 15px">
@@ -48,8 +60,14 @@
 
 <script setup>
 import { ref, nextTick, onMounted, watch } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { chat, getSubjects, getSessionMessages } from '../api'
 import { ElMessage } from 'element-plus'
+
+const route = useRoute()
+const router = useRouter()
+const questionId = ref(route.query.question_id || '')
+const questionTitle = ref(route.query.question_title || '')
 
 const GENERAL = '__general__'
 const messages = ref([])
@@ -104,6 +122,17 @@ watch(currentSubject, async (value) => {
   await loadSession(value)
 })
 
+watch(() => route.query.question_id, (value) => {
+  questionId.value = value || ''
+  questionTitle.value = route.query.question_title || ''
+})
+
+const clearQuestion = () => {
+  questionId.value = ''
+  questionTitle.value = ''
+  router.replace({ path: '/chat' })
+}
+
 const sendMessage = async () => {
   if (!inputMessage.value.trim()) return
 
@@ -116,7 +145,7 @@ const sendMessage = async () => {
   loading.value = true
 
   try {
-    const res = await chat(userMsg, sessionId.value, subjectId)
+    const res = await chat(userMsg, sessionId.value, subjectId, questionId.value || null)
     messages.value.push({ role: 'assistant', content: res.data.reply })
     sessionId.value = res.data.session_id
     localStorage.setItem(storageKey(subject), res.data.session_id)

@@ -155,6 +155,7 @@
         来源：{{ detailData.source || '-' }} · 标签：{{ detailData.tags || '-' }}
       </div>
       <template #footer>
+        <el-button @click="askXinyuehu">问心月狐</el-button>
         <el-button @click="showDetail = false">关闭</el-button>
       </template>
     </el-dialog>
@@ -457,6 +458,17 @@ const showDetailDialog = (row) => {
   choiceAnswer.value = ''
   choiceResult.value = null
   showDetail.value = true
+}
+
+const askXinyuehu = () => {
+  showDetail.value = false
+  router.push({
+    path: '/chat',
+    query: {
+      question_id: detailData.value.id,
+      question_title: detailData.value.title
+    }
+  })
 }
 
 const submitChoice = async () => {
