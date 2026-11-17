@@ -7,6 +7,7 @@
         <el-button v-if="username" type="danger" size="small" @click="logout">退出登录</el-button>
         <el-menu mode="horizontal" :ellipsis="false" style="background: transparent; border: none" router>
           <el-menu-item index="/">科目</el-menu-item>
+          <el-menu-item index="/materials">知识库</el-menu-item>
           <el-menu-item index="/chat">AI 助手</el-menu-item>
         </el-menu>
       </div>

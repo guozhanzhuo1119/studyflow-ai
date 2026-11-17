@@ -115,6 +115,7 @@ class VectorStore:
         """拼出用于 embedding 的文本，标题权重最高放最前面"""
         parts = [
             problem.get('title') or '',
+            problem.get('content') or '',
             problem.get('subject_name') or '',
             problem.get('chapter_name') or '',
             problem.get('knowledge_point_name') or '',
@@ -196,7 +197,7 @@ class VectorStore:
         """用于判断元数据是否发生变化，变了才重新 embedding"""
         return tuple(
             item.get(k) or ''
-            for k in ('title', 'tags', 'knowledge_point_name', 'chapter_name', 'subject_name')
+            for k in ('title', 'content', 'tags', 'knowledge_point_name', 'chapter_name', 'subject_name')
         )
 
     def sync(self, items: List[Dict]) -> Dict[str, int]:

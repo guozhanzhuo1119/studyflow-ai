@@ -36,6 +36,9 @@ studyflow-ai/
 │   ├── services/
 │   │   ├── hierarchy.py     # 层级级联删除 + 向量库清理
 │   │   ├── llm.py           # 统一 LLM 客户端
+│   │   ├── chapter_outline.py  # 教材 → 章节草案、章节正文定位
+│   │   ├── question_generator.py  # 章节正文 → 单项选择题（校验 / 去重 / 单事务入库）
+│   │   ├── materials.py     # 教材文本抽取、分块、关键词检索
 │   │   ├── memory.py        # LangChain 消息历史 -> MySQL
 │   │   ├── recommend.py     # 推荐服务（RAG + PydanticOutputParser）
 │   │   ├── auth.py          # 密码哈希、JWT 签发与校验
@@ -122,6 +125,7 @@ npm run dev
 ### 科目 / 章节 / 知识点（三层结构一致，均支持增删改查）
 - `GET|POST /api/subjects`、`GET|PUT|DELETE /api/subjects/{id}`
 - `GET|POST /api/chapters`（`?subject_id=` 过滤）、`GET|PUT|DELETE /api/chapters/{id}`
+- `POST /api/chapters/{id}/generate` - **章节 AI 出题**（body: `{count: 1~10, difficulty: 1~5}`，返回 `{generated, dropped, total_in_chapter}`）
 - `GET|POST /api/knowledge-points`（`?chapter_id=` 过滤）、`GET|PUT|DELETE /api/knowledge-points/{id}`
 
 ### 母题管理
@@ -214,6 +218,16 @@ npm run dev
 - [x] 母题批量导入
 - [ ] 做题记录统计
 - [ ] 学习报告生成
+
+## 实现备注
+
+- **教材 → 章节（L1）**：`GET /api/materials/{id}/outline` 用纯文本启发式识别「第X章 / 第X节 / 1.1 / 一、」，目录页（与下一条标题之间没有正文的候选）会被丢弃，同名标题只取正文首次出现；识别不到时按页范围临时分组。草案不落库，由前端改名/勾选/合并后调用 `POST /api/materials/{id}/outline/confirm` 一次性写入 `chapters`，同名校验在该接口内做。
+- **粘贴文字导入**：`POST /api/materials/text` 只把正文写入分块表，不落磁盘文件（`file_path` 为空），用于扫描版 PDF 无法抽取文字层时的人工兜底。
+- **分块短块处理**：`split_text` 末尾小于 `MIN_CHUNK` 的块改为并入前一块，不再丢弃；否则「第X章」这类标题会随短块一起消失，章节解析直接失效。
+- **章节 → 单选题（L2）**：`POST /api/chapters/{id}/generate` 先从该科目下的教材里按章节名定位正文（`chapter_outline.extract_chapter_text`，取标题行到下一章标题前，最多 6000 字），再用 `PydanticOutputParser` 约束 DeepSeek 输出题干/四选项/答案/解析/知识点。`chapters` 表本身不存正文，所以章节名必须与教材标题一致；找不到正文返回 400，提示先做「解析章节」。
+- **出题校验与入库**：逐题检查四选项齐全、答案属于 A/B/C/D、题干 ≥8 字、解析 ≥20 字，并按「同章节归一化标题」去重（含本章已有题目）；不合格题丢弃并计入 `dropped`。全部校验通过后才在一个事务里批量插入 `problems` 并复用/新建知识点，模型异常或全部不合格时直接报错、不写库；LLM 侧超时 120 秒，超时返回 504。
+- **答案侧数据不下发**：`problems.type/options/answer/explanation/difficulty` 为 L2 新增列，`options` 以 JSON 文本存储；列表与详情接口只返回 `type/options/difficulty`，`answer` 和 `explanation` 仅留在库内，避免刷题页直接看到答案。
+- **一次性补列脚本**：`create_all` 不会给已有表加列，升级已有库需执行一次 `python scripts/alter_problems_l2.py`（可重复执行，已存在的列会跳过）。
 
 ## License
 

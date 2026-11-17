@@ -35,13 +35,37 @@
       />
 
       <el-table :data="problems" stripe style="width: 100%">
-        <el-table-column prop="title" label="题目" />
+        <el-table-column label="题目">
+          <template #default="scope">
+            <div>{{ scope.row.title }}</div>
+            <div v-if="scope.row.options && scope.row.options.length" class="option-list">
+              <div v-for="(text, index) in scope.row.options" :key="index">
+                {{ optionLabel(index) }}. {{ text }}
+              </div>
+            </div>
+          </template>
+        </el-table-column>
+        <el-table-column label="难度" width="70">
+          <template #default="scope">{{ scope.row.difficulty || '-' }}</template>
+        </el-table-column>
         <el-table-column prop="source" label="来源" width="120" />
         <el-table-column prop="tags" label="标签" width="160" />
         <el-table-column prop="status" label="状态" width="90" />
-        <el-table-column v-if="searchMode" prop="score" label="相似度" width="100" />
-        <el-table-column label="操作" width="430">
+        <el-table-column label="作答" width="150">
           <template #default="scope">
+            <span v-if="attemptStats[scope.row.id]">
+              已做 {{ attemptStats[scope.row.id].total }} 次 · 正确率 {{ Math.round((attemptStats[scope.row.id].accuracy || 0) * 100) }}%
+            </span>
+            <span v-else style="color: #c0c4cc">未做</span>
+          </template>
+        </el-table-column>
+        <el-table-column v-if="searchMode" prop="score" label="相似度" width="100" />
+        <el-table-column label="操作" width="690">
+          <template #default="scope">
+            <el-button type="success" size="small" @click="recordAttempt(scope.row, 'correct')">对</el-button>
+            <el-button type="warning" size="small" @click="openWrongDialog(scope.row)">错</el-button>
+            <el-button size="small" @click="recordAttempt(scope.row, 'giveup')">放弃</el-button>
+            <el-button type="primary" size="small" @click="showDetailDialog(scope.row)">查看</el-button>
             <el-button type="primary" size="small" @click="goVariants(scope.row)">变题</el-button>
             <el-button size="small" @click="openRecommend(scope.row)">AI 推荐</el-button>
             <el-button size="small" @click="goError(scope.row)">错因归因</el-button>
@@ -53,10 +77,26 @@
     </el-card>
 
     <!-- 新建 / 编辑题目 -->
-    <el-dialog v-model="showDialog" :title="editingId ? '编辑题目' : '新建题目'" width="520px">
+    <el-dialog v-model="showDialog" :title="editingId ? '编辑题目' : '新建题目'" width="720px">
       <el-form :model="form" label-width="90px">
-        <el-form-item label="题目">
+        <el-form-item label="题目标题">
           <el-input v-model="form.title" placeholder="题目标题" />
+        </el-form-item>
+        <el-form-item label="题目正文">
+          <div style="width: 100%">
+            <div style="margin-bottom: 6px; display: flex; gap: 8px; align-items: center">
+              <span style="color: #909399; font-size: 13px">Markdown 支持：KaTeX 公式 `$...$`、`$$...$$`，图片 `![](uploads/xxx.png)`</span>
+              <el-upload :show-file-list="false" :auto-upload="false" :on-change="insertImage" accept="image/*">
+                <el-button size="small" plain>插入图片</el-button>
+              </el-upload>
+            </div>
+            <el-input
+              v-model="form.content"
+              type="textarea"
+              :rows="8"
+              placeholder="例如：&#10;求极限 $\lim_{x \to 0} \frac{\sin x}{x}$&#10;&#10;![](uploads/problem_xxx.png)&#10;&#10;选项：A. 0 B. 1 C. ∞ D. 不存在"
+            />
+          </div>
         </el-form-item>
         <el-form-item label="来源">
           <el-input v-model="form.source" placeholder="例如：考研真题" />
@@ -71,6 +111,25 @@
       </template>
     </el-dialog>
 
+    <!-- 查看题目详情 -->
+    <el-dialog v-model="showDetail" :title="'题目：' + (detailData.title || '')" width="760px">
+      <MarkdownViewer v-if="detailData.content" :source="detailData.content" />
+      <div v-if="detailData.options && detailData.options.length" class="detail-options">
+        <div v-for="(text, index) in detailData.options" :key="index" class="detail-option">
+          {{ optionLabel(index) }}. {{ text }}
+        </div>
+      </div>
+      <div v-if="!detailData.content && !(detailData.options && detailData.options.length)" style="color: #909399; text-align: center; padding: 20px">
+        暂无正文，点击编辑按钮填写
+      </div>
+      <div style="margin-top: 12px; color: #909399; font-size: 13px">
+        来源：{{ detailData.source || '-' }} · 标签：{{ detailData.tags || '-' }}
+      </div>
+      <template #footer>
+        <el-button @click="showDetail = false">关闭</el-button>
+      </template>
+    </el-dialog>
+
     <!-- AI 推荐 -->
     <el-dialog v-model="showRecommend" title="AI 推荐变题" width="720px">
       <div v-if="recommendLoading" style="text-align: center; padding: 30px">正在检索相似题并生成推荐...</div>
@@ -79,7 +138,7 @@
           <div class="recommend-title">{{ item.title }}</div>
           <div class="recommend-meta">
             难度：{{ item.difficulty || '未知' }}
-            <span v-if="item.link"> · <a :href="item.link" target="_blank">题目链接</a></span>
+            <span v-if="item.link"> · <a v-if="isUrl(item.link)" :href="item.link" target="_blank" rel="noopener">题目链接</a><template v-else>{{ item.link }}</template></span>
           </div>
           <div class="recommend-reason">{{ item.reason }}</div>
           <el-button size="small" type="primary" plain @click="saveOne(item, index)">保存为变题</el-button>
@@ -125,6 +184,34 @@
         </el-button>
       </template>
     </el-dialog>
+
+    <el-dialog v-model="showWrongDialog" title="记录错因" width="560px">
+      <el-form label-width="90px">
+        <el-form-item label="题目">
+          <span>{{ wrongTarget?.title }}</span>
+        </el-form-item>
+        <el-form-item label="错因">
+          <el-select v-model="wrongType" placeholder="选最接近的一类" style="width: 100%">
+            <el-option
+              v-for="item in errorTypes"
+              :key="item.code"
+              :label="item.priority + '. ' + item.name"
+              :value="item.code"
+            >
+              <span>{{ item.name }}</span>
+              <span style="float: right; color: #909399; font-size: 12px">{{ item.signal }}</span>
+            </el-option>
+          </el-select>
+        </el-form-item>
+        <el-form-item label="具体表现">
+          <el-input v-model="wrongNote" maxlength="50" placeholder="例：没看出是滑动窗口 / 边界少判空链表" />
+        </el-form-item>
+      </el-form>
+      <template #footer>
+        <el-button @click="showWrongDialog = false">取消</el-button>
+        <el-button type="primary" @click="submitWrong">保存并记一次做错</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -133,9 +220,14 @@ import { ref, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   getProblems, getKnowledgePoint, createProblem, updateProblem, deleteProblem,
-  searchProblems, recommend, createVariant, importProblems
+  searchProblems, recommend, createVariant, importProblems, uploadImage,
+  createAttempt, getAttemptOverview, getErrorMeta
 } from '../api'
+import MarkdownViewer from '../components/MarkdownViewer.vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+
+// 只有完整 URL 才当链接渲染，否则相对路径会跳到错误页面
+const isUrl = (value) => /^https?:\/\/\S+/i.test((value || '').trim())
 
 const route = useRoute()
 const router = useRouter()
@@ -148,12 +240,23 @@ const chapterId = ref('')
 
 const showDialog = ref(false)
 const editingId = ref('')
-const form = ref({ title: '', source: '', tags: '' })
+const form = ref({ title: '', content: '', source: '', tags: '' })
 const saving = ref(false)
+
+const showDetail = ref(false)
+const detailData = ref({})
 
 const searchQuery = ref('')
 const searching = ref(false)
 const searchMode = ref(false)
+// 按题目 id 聚合作答次数，来自 attempts 表
+const attemptStats = ref({})
+// 记录错因弹窗
+const showWrongDialog = ref(false)
+const wrongTarget = ref(null)
+const wrongType = ref('')
+const wrongNote = ref('')
+const errorTypes = ref([])
 
 const showRecommend = ref(false)
 const recommendLoading = ref(false)
@@ -190,6 +293,8 @@ const pathText = computed(() =>
 onMounted(() => {
   loadProblems()
   loadPath()
+  loadAttemptStats()
+  loadErrorTypes()
 })
 
 const loadPath = async () => {
@@ -211,6 +316,63 @@ const loadProblems = async () => {
     searchMode.value = false
   } catch (error) {
     ElMessage.error('加载题目失败')
+  }
+}
+
+const loadAttemptStats = async () => {
+  try {
+    const res = await getAttemptOverview({ knowledge_point_id: route.params.kpId })
+    attemptStats.value = res.data.stats || {}
+  } catch (error) {
+    attemptStats.value = {}
+  }
+}
+
+const recordAttempt = async (row, result) => {
+  try {
+    const res = await createAttempt({ target_type: 'problem', target_id: row.id, result })
+    attemptStats.value = { ...attemptStats.value, [row.id]: res.data.stats }
+    const text = { correct: '已记一次：做对', wrong: '已记一次：做错', giveup: '已记一次：放弃' }[result]
+    ElMessage.success(text)
+  } catch (error) {
+    ElMessage.error('记录失败')
+  }
+}
+
+const openWrongDialog = (row) => {
+  wrongTarget.value = row
+  wrongType.value = ''
+  wrongNote.value = ''
+  showWrongDialog.value = true
+}
+
+const submitWrong = async () => {
+  if (!wrongType.value) {
+    ElMessage.warning('先选一个错因')
+    return
+  }
+  try {
+    const res = await createAttempt({
+      target_type: 'problem',
+      target_id: wrongTarget.value.id,
+      result: 'wrong',
+      error_type: wrongType.value,
+      error_reason: wrongNote.value,
+    })
+    attemptStats.value = { ...attemptStats.value, [wrongTarget.value.id]: res.data.stats }
+    showWrongDialog.value = false
+    ElMessage.success('已记一次做错，并生成归因记录')
+  } catch (error) {
+    ElMessage.error('保存失败')
+  }
+}
+
+const loadErrorTypes = async () => {
+  try {
+    const res = await getErrorMeta()
+    errorTypes.value = res.data.error_types || []
+  } catch (error) {
+    errorTypes.value = []
   }
 }
 
@@ -240,14 +402,42 @@ const clearSearch = () => {
 
 const openAdd = () => {
   editingId.value = ''
-  form.value = { title: '', source: '', tags: '' }
+  form.value = { title: '', content: '', source: '', tags: '' }
   showDialog.value = true
 }
 
 const openEdit = (row) => {
   editingId.value = row.id
-  form.value = { title: row.title, source: row.source || '', tags: row.tags || '' }
+  form.value = { title: row.title, content: row.content || '', source: row.source || '', tags: row.tags || '' }
   showDialog.value = true
+}
+
+const showDetailDialog = (row) => {
+  detailData.value = {
+    title: row.title,
+    content: row.content || '',
+    options: row.options || [],
+    difficulty: row.difficulty,
+    source: row.source,
+    tags: row.tags
+  }
+  showDetail.value = true
+}
+
+const optionLabel = (index) => ['A', 'B', 'C', 'D'][index] || String(index + 1)
+
+const insertImage = async (uploadFile) => {
+  const file = uploadFile.raw
+  if (!file) return
+  try {
+    ElMessage.info('上传中...')
+    const res = await uploadImage(file)
+    const url = res.data.url
+    form.value.content = (form.value.content || '').trimEnd() + `\n\n![](${url})\n`
+    ElMessage.success('已插入图片')
+  } catch (error) {
+    ElMessage.error('图片上传失败')
+  }
 }
 
 const submit = async () => {
@@ -258,6 +448,7 @@ const submit = async () => {
   saving.value = true
   const payload = {
     title: form.value.title,
+    content: form.value.content || null,
     source: form.value.source,
     tags: form.value.tags,
     knowledge_point_id: route.params.kpId
@@ -397,6 +588,20 @@ const goBack = () => {
 </script>
 
 <style scoped>
+.option-list {
+  margin-top: 4px;
+  color: #606266;
+  font-size: 13px;
+  line-height: 1.8;
+}
+.detail-options {
+  margin-top: 12px;
+  color: #303133;
+  line-height: 2;
+}
+.detail-option {
+  padding: 2px 0;
+}
 .recommend-item {
   border: 1px solid #ebeef5;
   border-radius: 6px;

@@ -41,6 +41,9 @@ export const getChapter = (id) => api.get(`/chapters/${id}`)
 export const createChapter = (data) => api.post('/chapters', data)
 export const updateChapter = (id, data) => api.put(`/chapters/${id}`, data)
 export const deleteChapter = (id) => api.delete(`/chapters/${id}`)
+// 章节正文 -> AI 出题（同步生成，最长 120 秒）
+export const generateChapterQuestions = (chapterId, data) =>
+  api.post(`/chapters/${chapterId}/generate`, data, { timeout: 130000 })
 
 // 知识点
 export const getKnowledgePoints = (chapterId) =>
@@ -84,13 +87,43 @@ export const getErrorStatistics = (practiceMode = true) =>
   api.get('/errors/statistics', { params: { practice_mode: practiceMode } })
 
 // AI 对话
-export const chat = (message, sessionId = null) => api.post('/chat', { message, session_id: sessionId })
+export const chat = (message, sessionId = null, subjectId = null) =>
+  api.post('/chat', { message, session_id: sessionId, subject_id: subjectId })
 export const getSessions = () => api.get('/chat/sessions')
+export const getSessionMessages = (sessionId) => api.get(`/chat/sessions/${sessionId}/messages`)
+export const createAttempt = (data) => api.post('/attempts', data)
+export const getAttemptOverview = (params) => api.get('/attempts/overview', { params })
 export const deleteSession = (sessionId) => api.delete(`/chat/sessions/${sessionId}`)
 
 // 认证
 export const register = (data) => api.post('/auth/register', data)
 export const login = (data) => api.post('/auth/login', data)
 export const getCurrentUser = (token) => api.get('/auth/me', { params: { token } })
+
+// 文件上传（图片）
+export const uploadImage = (file) => {
+  const fd = new FormData()
+  fd.append('file', file)
+  return api.post('/upload', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
+}
+
+// 知识库（教材 / 文档）
+export const uploadMaterial = (file, title = '', subjectId = '') => {
+  const fd = new FormData()
+  fd.append('file', file)
+  fd.append('title', title)
+  fd.append('subject_id', subjectId)
+  return api.post('/materials/upload', fd, {
+    headers: { 'Content-Type': 'multipart/form-data' },
+    timeout: 120000
+  })
+}
+export const getMaterials = () => api.get('/materials')
+export const getMaterialChunks = (id, params) => api.get(`/materials/${id}/chunks`, { params })
+export const deleteMaterial = (id) => api.delete(`/materials/${id}`)
+// 教材 -> 章节（L1）
+export const getMaterialOutline = (id) => api.get(`/materials/${id}/outline`)
+export const confirmMaterialOutline = (id, data) => api.post(`/materials/${id}/outline/confirm`, data)
+export const importMaterialText = (data) => api.post('/materials/text', data)
 
 export default api

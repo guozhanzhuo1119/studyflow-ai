@@ -14,6 +14,7 @@ from typing import Dict, List, Optional
 
 from sqlalchemy.orm import Session
 
+from app.models.attempt import Attempt
 from app.models.error import (
     ERROR_TYPE_META,
     ErrorAnalysis,
@@ -125,8 +126,8 @@ def get_presets(topic: Optional[str] = None) -> dict:
 def build_statistics(db: Session, practice_mode: bool = True) -> dict:
     """练习模式只报四指标；模拟模式额外返回 accuracy/avg_time/stability。
 
-    模拟阶段指标暂时没有数据源（做题记录表还没有用时字段），先返回 None，
-    等做题记录补上后再接。
+    模拟阶段指标的数据源是 attempts 表（每次作答一条记录），
+    没有作答记录时三项返回 None。
     """
     rows: List[ErrorAnalysis] = db.query(ErrorAnalysis).all()
 
@@ -145,16 +146,32 @@ def build_statistics(db: Session, practice_mode: bool = True) -> dict:
 
     pending = sum(1 for r in rows if r.remedy_status == RemedyStatus.PENDING.value)
 
+    attempt_rows = db.query(Attempt).all()
+    graded = [a for a in attempt_rows if a.result in ('correct', 'wrong')]
+    accuracy = (
+        round(sum(1 for a in graded if a.result == 'correct') / len(graded), 4) if graded else None
+    )
+    durations = [a.duration_sec for a in attempt_rows if a.duration_sec]
+    avg_time = round(sum(durations) / len(durations), 1) if durations else None
+    # 稳定度取最近 10 次作答的正确率，样本不足 10 次时即为当前正确率
+    recent = sorted(attempt_rows, key=lambda a: a.id)[-10:]
+    recent_graded = [a for a in recent if a.result in ('correct', 'wrong')]
+    stability = (
+        round(sum(1 for a in recent_graded if a.result == 'correct') / len(recent_graded), 4)
+        if recent_graded else None
+    )
+
     stats = {
         'error_distribution': distribution,
         'identify_latency_avg_sec': latency_avg,
         'decomposition_coverage': coverage,
         'remedy_pending_count': pending,
         'total': len(rows),
+        'attempt_total': len(attempt_rows),
     }
 
     if not practice_mode:
-        stats.update({'accuracy': None, 'avg_time_sec': None, 'stability': None})
+        stats.update({'accuracy': accuracy, 'avg_time_sec': avg_time, 'stability': stability})
 
     return stats
 

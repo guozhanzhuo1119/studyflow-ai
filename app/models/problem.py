@@ -45,8 +45,14 @@ class Problem(Base):
 
     id = Column(String(36), primary_key=True)
     title = Column(String(200), nullable=False)# 题目标题
+    content = Column(Text)# 题目正文，Markdown，可嵌入图片引用 ![](uploads/xxx.png)
     source = Column(String(100))# 题目来源
     tags = Column(String(200))# 题目标签
+    type = Column('type', String(16), default='single')# 题型：single（单选题）
+    options = Column(Text)# 单选题的四个选项，JSON 文本，按 A/B/C/D 顺序
+    answer = Column(String(8))# 正确答案，A/B/C/D；不下发给刷题页
+    explanation = Column(Text)# 答案解析，不下发给刷题页
+    difficulty = Column(Integer, default=3)# 难度 1~5，数字越大越难
     status = Column(String(20), default='todo')# 题目状态，比如“todo”、“doing”、“done”
     knowledge_point_id = Column(String(36), ForeignKey('knowledge_points.id'), nullable=False, index=True)
     created_at = Column(DateTime, nullable=False)
@@ -61,6 +67,7 @@ class Variant(Base):
     id = Column(String(36), primary_key=True)
     problem_id = Column(String(36), ForeignKey('problems.id'), nullable=False, index=True)
     title = Column(String(200), nullable=False)# 变题标题
+    content = Column(Text)# 变题正文，Markdown，可嵌入图片引用 ![](uploads/xxx.png)
     difficulty = Column(String(20))# 难度：easy / medium / hard
     link = Column(String(300))# 题目链接，可空
     reason = Column(Text)# 推荐理由或补充说明

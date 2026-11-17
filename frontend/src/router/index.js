@@ -7,6 +7,7 @@ import ProblemList from '../views/ProblemList.vue'
 import VariantList from '../views/VariantList.vue'
 import Chat from '../views/Chat.vue'
 import ErrorAnalysis from '../views/ErrorAnalysis.vue'
+import KnowledgeBase from '../views/KnowledgeBase.vue'
 
 const routes = [
   {
@@ -54,6 +55,12 @@ const routes = [
     path: '/errors',
     name: 'Errors',
     component: ErrorAnalysis,
+    meta: { requiresAuth: true }
+  },
+  {
+    path: '/materials',
+    name: 'Materials',
+    component: KnowledgeBase,
     meta: { requiresAuth: true }
   }
 ]

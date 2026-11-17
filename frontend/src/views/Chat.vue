@@ -3,7 +3,13 @@
     <el-card>
       <template #header>
         <div style="display: flex; justify-content: space-between; align-items: center">
-          <span style="font-size: 18px; font-weight: bold">AI 学习助手</span>
+          <div style="display: flex; align-items: center; gap: 10px">
+            <span style="font-size: 18px; font-weight: bold">AI 学习助手</span>
+            <el-select v-model="currentSubject" size="small" style="width: 150px" placeholder="选择科目">
+              <el-option label="通用" :value="GENERAL" />
+              <el-option v-for="s in subjects" :key="s.id" :label="s.name" :value="s.id" />
+            </el-select>
+          </div>
           <el-button size="small" @click="resetSession">开启新对话</el-button>
         </div>
       </template>
@@ -41,41 +47,89 @@
 </template>
 
 <script setup>
-import { ref, nextTick } from 'vue'
-import { chat } from '../api'
+import { ref, nextTick, onMounted, watch } from 'vue'
+import { chat, getSubjects, getSessionMessages } from '../api'
 import { ElMessage } from 'element-plus'
 
+const GENERAL = '__general__'
 const messages = ref([])
 const inputMessage = ref('')
 const loading = ref(false)
-// 会话 id 存本地，刷新页面后还能接着之前的话题聊（历史在后端数据库里）
-const sessionId = ref(localStorage.getItem('chatSessionId'))
 const chatContainer = ref(null)
+const subjects = ref([])
+// 记住上次选的科目，刷新页面后自动回到那个科目的对话
+const currentSubject = ref(localStorage.getItem('chatSubject') || GENERAL)
+const sessionId = ref(null)
+
+// 每个科目各存一份会话 id，切换科目时互不覆盖
+const storageKey = (subject) => `chatSessionId:${subject}`
+
+const scrollToBottom = async () => {
+  await nextTick()
+  if (chatContainer.value) {
+    chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+  }
+}
+
+const loadSession = async (subject) => {
+  messages.value = []
+  sessionId.value = localStorage.getItem(storageKey(subject))
+  if (!sessionId.value) return
+  try {
+    const res = await getSessionMessages(sessionId.value)
+    messages.value = res.data.messages
+      .filter((msg) => msg.role !== 'system')
+      .map((msg) => ({ role: msg.role, content: msg.content }))
+    await scrollToBottom()
+  } catch (error) {
+    // 会话已被删除或不存在，清掉本地残留的 id
+    localStorage.removeItem(storageKey(subject))
+    sessionId.value = null
+  }
+}
+
+onMounted(async () => {
+  try {
+    const res = await getSubjects()
+    subjects.value = res.data || []
+  } catch (error) {
+    subjects.value = []
+  }
+  await loadSession(currentSubject.value)
+})
+
+// 切换科目就切换会话，并恢复该科目上一次的聊天记录
+watch(currentSubject, async (value) => {
+  localStorage.setItem('chatSubject', value)
+  await loadSession(value)
+})
 
 const sendMessage = async () => {
   if (!inputMessage.value.trim()) return
 
+  const subject = currentSubject.value
+  // 通用对话不限定科目，选了科目则把 id 带给后端，让工具只在该科目内检索统计
+  const subjectId = subject === GENERAL ? null : subject
   const userMsg = inputMessage.value
   messages.value.push({ role: 'user', content: userMsg })
   inputMessage.value = ''
   loading.value = true
 
   try {
-    const res = await chat(userMsg, sessionId.value)
+    const res = await chat(userMsg, sessionId.value, subjectId)
     messages.value.push({ role: 'assistant', content: res.data.reply })
     sessionId.value = res.data.session_id
-    localStorage.setItem('chatSessionId', res.data.session_id)
+    localStorage.setItem(storageKey(subject), res.data.session_id)
   } catch (error) {
     ElMessage.error('发送失败')
   } finally {
     loading.value = false
-    await nextTick()
-    chatContainer.value.scrollTop = chatContainer.value.scrollHeight
+    await scrollToBottom()
   }
 }
 
 const resetSession = () => {
-  localStorage.removeItem('chatSessionId')
+  localStorage.removeItem(storageKey(currentSubject.value))
   sessionId.value = null
   messages.value = []
 }

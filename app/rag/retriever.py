@@ -10,7 +10,7 @@ from app.rag.vector_store import vector_store
 
 logger = logging.getLogger(__name__)
 
-_SEARCH_FIELDS = ('id', 'title', 'source', 'tags', 'knowledge_point_id', 'status')
+_SEARCH_FIELDS = ('id', 'title', 'content', 'source', 'tags', 'knowledge_point_id', 'status')
 
 
 def problem_to_dict(

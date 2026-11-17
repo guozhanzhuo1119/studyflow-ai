@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app import get_db
 from app.agent.analyzer import run_agent
 from app.models.chat import ChatMessage, ChatSession
+from app.models.problem import Subject
 from app.services.memory import DBMessageHistory, get_or_create_session
 import uuid
 
@@ -17,6 +18,7 @@ router = APIRouter(prefix='/api/chat', tags=['AI 对话'])
 class ChatRequest(BaseModel):
     message: str
     session_id: str | None = None
+    subject_id: str | None = None  # 当前科目，用于把检索和统计限定在该科目
 
 
 class ChatResponse(BaseModel):
@@ -30,10 +32,17 @@ def chat(request: ChatRequest, db: Session = Depends(get_db)):
     session_id = request.session_id or f'session-{uuid.uuid4().hex[:8]}'
     session = get_or_create_session(db, session_id, title=request.message[:40])
 
-    history = DBMessageHistory(session_id)
-    reply = run_agent(request.message, history.messages)
+    subject_name = ''
+    if request.subject_id:
+        subject = db.query(Subject).filter(Subject.id == request.subject_id).first()
+        subject_name = subject.name if subject else ''
 
-    # 用户消息与最终回答一起落库
+    history = DBMessageHistory(session_id)
+    # 给模型一个明确的科目范围，它会把 subject_name 传给检索和统计工具
+    scoped = f'【当前科目：{subject_name}】\n{request.message}' if subject_name else request.message
+    reply = run_agent(scoped, history.messages)
+
+    # 用户消息与最终回答一起落库（存原文，不带范围前缀）
     history.add_messages([HumanMessage(content=request.message), AIMessage(content=reply)])
 
     session.updated_at = datetime.now()

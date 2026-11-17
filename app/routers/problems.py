@@ -6,6 +6,7 @@ from app.rag.retriever import index_problem, remove_problem, semantic_search
 from pydantic import BaseModel
 from typing import List
 from datetime import datetime
+import json
 import logging
 import uuid
 
@@ -15,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 class ProblemCreate(BaseModel):
     title: str
+    content: str | None = None# 题目正文 Markdown，可空
     source: str | None = None
     tags: str | None = None
     knowledge_point_id: str
@@ -29,6 +31,7 @@ class ProblemImportItem(BaseModel):
     title: str
     source: str | None = None
     tags: str | None = None
+    content: str | None = None
 
 
 class ProblemImportRequest(BaseModel):
@@ -36,15 +39,31 @@ class ProblemImportRequest(BaseModel):
     items: List[ProblemImportItem]
 
 
+def _parse_options(raw: str | None) -> list:
+    """options 列存 JSON 文本；历史题目为空，返回空数组"""
+    if not raw:
+        return []
+    try:
+        value = json.loads(raw)
+    except (TypeError, ValueError):
+        return []
+    return value if isinstance(value, list) else []
+
+
 def _serialize(problem: Problem) -> dict:
+    """注意：answer / explanation 属于答案侧数据，任何列表/详情接口都不下发"""
     kp = problem.knowledge_point
     chapter = kp.chapter if kp else None
     subject = chapter.subject if chapter else None
     return {
         'id': problem.id,
         'title': problem.title,
+        'content': problem.content,
         'source': problem.source,
         'tags': problem.tags,
+        'type': problem.type,
+        'options': _parse_options(problem.options),
+        'difficulty': problem.difficulty,
         'status': problem.status,
         'knowledge_point_id': problem.knowledge_point_id,
         'knowledge_point_name': kp.name if kp else None,
@@ -111,6 +130,7 @@ def import_problems(data: ProblemImportRequest, db: Session = Depends(get_db)):
             title=title,
             source=(item.source or '').strip() or None,
             tags=(item.tags or '').strip() or None,
+            content=(item.content or '').strip() or None,
             knowledge_point_id=data.knowledge_point_id,
             status='todo',
             created_at=datetime.now()
@@ -142,6 +162,7 @@ def create_problem(data: ProblemCreate, db: Session = Depends(get_db)):
     problem = Problem(
         id=f'prob-{uuid.uuid4().hex[:8]}',
         title=data.title,
+        content=data.content,
         source=data.source,
         tags=data.tags,
         knowledge_point_id=data.knowledge_point_id,
@@ -168,6 +189,7 @@ def update_problem(problem_id: str, data: ProblemCreate, db: Session = Depends(g
         raise HTTPException(404, '题目不存在')
 
     problem.title = data.title
+    problem.content = data.content
     problem.source = data.source
     problem.tags = data.tags
     problem.knowledge_point_id = data.knowledge_point_id

@@ -2,12 +2,13 @@ from datetime import datetime
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from app import get_db
 from app.models.problem import Chapter, Subject
 from app.services.hierarchy import delete_chapter
+from app.services.question_generator import GenerationError, generate_questions
 
 router = APIRouter(prefix='/api/chapters', tags=['章节'])
 
@@ -16,6 +17,11 @@ class ChapterCreate(BaseModel):
     subject_id: str
     name: str
     order_num: int = 0
+
+
+class GenerateRequest(BaseModel):
+    count: int = Field(default=5, ge=1, le=10)# 生成题数
+    difficulty: int = Field(default=3, ge=1, le=5)# 难度 1~5
 
 
 def _serialize(chapter: Chapter) -> dict:
@@ -62,6 +68,23 @@ def create_chapter(data: ChapterCreate, db: Session = Depends(get_db)):
     db.commit()
     db.refresh(chapter)
     return _serialize(chapter)
+
+
+@router.post('/{chapter_id}/generate')
+def generate_chapter_questions(
+    chapter_id: str,
+    data: GenerateRequest,
+    db: Session = Depends(get_db),
+):
+    """按章节正文生成单项选择题；模型失败或校验全灭时不写库"""
+    chapter = db.query(Chapter).filter(Chapter.id == chapter_id).first()
+    if not chapter:
+        raise HTTPException(404, '章节不存在')
+
+    try:
+        return generate_questions(db, chapter, data.count, data.difficulty)
+    except GenerationError as error:
+        raise HTTPException(error.status_code, error.message)
 
 
 @router.put('/{chapter_id}')

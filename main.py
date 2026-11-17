@@ -1,16 +1,20 @@
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from contextlib import asynccontextmanager
 from app import engine, SessionLocal
 from app.models.problem import Base as ProblemBase
 from app.models.user import Base as UserBase
 from app.models.chat import Base as ChatBase
 from app.models.error import Base as ErrorBase
+from app.models.attempt import Base as AttemptBase
+from app.models.material import Base as MaterialBase
 from app.routers import (
     subjects, chapters, knowledge_points, problems,
-    variants, recommend, chat, auth, error,
+    variants, recommend, chat, auth, error, uploads, attempts, materials,
 )
 
 logger = logging.getLogger(__name__)
@@ -23,6 +27,8 @@ async def lifespan(app: FastAPI):
     UserBase.metadata.create_all(bind=engine)
     ChatBase.metadata.create_all(bind=engine)
     ErrorBase.metadata.create_all(bind=engine)
+    AttemptBase.metadata.create_all(bind=engine)
+    MaterialBase.metadata.create_all(bind=engine)
 
     # 把数据库中的题目同步进 FAISS，保证语义检索可用
     from app.rag.retriever import sync_all_problems
@@ -61,6 +67,14 @@ app.include_router(variants.router)
 app.include_router(recommend.router)
 app.include_router(chat.router)
 app.include_router(error.router)
+app.include_router(uploads.router)
+app.include_router(attempts.router)
+app.include_router(materials.router)
+
+# 挂载 uploads/ 目录为静态资源，Markdown 里 ![](/uploads/xxx.png) 可直接渲染
+_uploads_dir = Path(__file__).resolve().parent / 'uploads'
+_uploads_dir.mkdir(exist_ok=True)
+app.mount('/uploads', StaticFiles(directory=str(_uploads_dir)), name='uploads')
 
 
 @app.get('/')

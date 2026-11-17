@@ -21,7 +21,7 @@ class Recommendation(BaseModel):
 
     title: str = Field(description='题目名称或清晰的题目描述')
     difficulty: str = Field(description='难度，只能是 easy / medium / hard 之一')
-    link: str = Field(default='', description='题目出处，例如「2019 年数一真题」「LeetCode」，没有就留空字符串')
+    link: str = Field(default='', description='题目的完整 URL，必须以 http:// 或 https:// 开头；不知道具体链接就留空字符串，不要填写平台名或题目出处')
     reason: str = Field(description='为什么适合作为变体，考查了什么相同的知识点或方法')
 
     @field_validator('difficulty')
@@ -32,6 +32,13 @@ class Recommendation(BaseModel):
                    '困难': 'hard', '较难': 'hard', '高': 'hard', '低': 'easy'}
         value = (value or 'medium').strip().lower()
         return mapping.get(value, value if value in {'easy', 'medium', 'hard'} else 'medium')
+
+    @field_validator('link')
+    @classmethod
+    def normalize_link(cls, value: str) -> str:
+        """模型常把「出处」写进 link，非 URL 会被前端当成相对路径跳转"""
+        value = (value or '').strip()
+        return value if value.startswith(('http://', 'https://')) else ''
 
 
 class RecommendationList(BaseModel):

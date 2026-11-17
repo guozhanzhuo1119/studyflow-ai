@@ -23,3 +23,7 @@ python-jose>=3.3.0
 # 工具
 python-dotenv>=1.0.1
 pydantic>=2.9.0
+python-multipart>=0.0.9
+
+# 知识库（PDF 文本抽取）
+pymupdf>=1.24.0

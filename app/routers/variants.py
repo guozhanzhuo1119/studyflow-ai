@@ -15,6 +15,7 @@ router = APIRouter(prefix='/api/variants', tags=['变题'])
 class VariantCreate(BaseModel):
     problem_id: str
     title: str
+    content: str | None = None
     difficulty: str | None = None
     link: str | None = None
     reason: str | None = None
@@ -22,6 +23,7 @@ class VariantCreate(BaseModel):
 
 class VariantItem(BaseModel):
     title: str
+    content: str | None = None
     difficulty: str | None = None
     link: str | None = None
     reason: str | None = None
@@ -38,6 +40,7 @@ def _serialize(variant: Variant) -> dict:
         'problem_id': variant.problem_id,
         'problem_title': variant.problem.title if variant.problem else None,
         'title': variant.title,
+        'content': variant.content,
         'difficulty': variant.difficulty,
         'link': variant.link,
         'reason': variant.reason,
@@ -76,6 +79,7 @@ def create_variant(data: VariantCreate, db: Session = Depends(get_db)):
         id=f'var-{uuid.uuid4().hex[:8]}',
         problem_id=data.problem_id,
         title=data.title,
+        content=data.content,
         difficulty=data.difficulty,
         link=data.link,
         reason=data.reason,
@@ -101,6 +105,7 @@ def save_from_recommendation(data: SaveFromRecommendation, db: Session = Depends
             id=f'var-{uuid.uuid4().hex[:8]}',
             problem_id=data.problem_id,
             title=item.title,
+            content=item.content,
             difficulty=item.difficulty,
             link=item.link,
             reason=item.reason,
@@ -123,6 +128,7 @@ def update_variant(variant_id: str, data: VariantCreate, db: Session = Depends(g
     _require_problem(db, data.problem_id)
     variant.problem_id = data.problem_id
     variant.title = data.title
+    variant.content = data.content
     variant.difficulty = data.difficulty
     variant.link = data.link
     variant.reason = data.reason

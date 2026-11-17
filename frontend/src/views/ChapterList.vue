@@ -18,9 +18,10 @@
         <el-table-column prop="order_num" label="排序" width="80" />
         <el-table-column prop="knowledge_point_count" label="知识点数" width="110" />
         <el-table-column prop="created_at" label="创建时间" width="180" />
-        <el-table-column label="操作" width="260">
+        <el-table-column label="操作" width="440">
           <template #default="scope">
             <el-button type="primary" size="small" @click="goToKnowledgePoints(scope.row)">查看知识点</el-button>
+            <el-button type="success" size="small" @click="openGenerate(scope.row)">AI 出题</el-button>
             <el-button size="small" @click="openEdit(scope.row)">编辑</el-button>
             <el-button type="danger" size="small" @click="removeFn(scope.row)">删除</el-button>
           </template>
@@ -42,13 +43,43 @@
         <el-button type="primary" @click="submit">确定</el-button>
       </template>
     </el-dialog>
+
+    <!-- AI 出题：按章节正文生成单项选择题 -->
+    <el-dialog v-model="showGenerate" :title="`AI 出题 · ${genTarget?.name || ''}`" width="460px">
+      <el-form label-width="90px">
+        <el-form-item label="题目数量">
+          <el-input-number v-model="genForm.count" :min="1" :max="10" />
+        </el-form-item>
+        <el-form-item label="难度">
+          <el-select v-model="genForm.difficulty" style="width: 160px">
+            <el-option v-for="item in difficultyOptions" :key="item.value" :label="item.label" :value="item.value" />
+          </el-select>
+        </el-form-item>
+      </el-form>
+      <el-alert
+        title="生成需要 10~60 秒；题目正文取自知识库中该科目教材的对应章节，请先确认已完成「解析章节」"
+        type="info"
+        :closable="false"
+        style="margin-bottom: 12px"
+      />
+      <el-alert
+        v-if="genResult"
+        :title="`成功生成 ${genResult.generated} 道，丢弃 ${genResult.dropped} 道，本章现有 ${genResult.total_in_chapter} 道`"
+        type="success"
+        :closable="false"
+      />
+      <template #footer>
+        <el-button @click="showGenerate = false">关闭</el-button>
+        <el-button type="primary" :loading="generating" @click="submitGenerate">开始生成</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getChapters, getSubject, createChapter, updateChapter, deleteChapter } from '../api'
+import { getChapters, getSubject, createChapter, updateChapter, deleteChapter, generateChapterQuestions } from '../api'
 import { ElMessage, ElMessageBox } from 'element-plus'
 
 const route = useRoute()
@@ -58,6 +89,42 @@ const subjectName = ref('')
 const showDialog = ref(false)
 const editingId = ref('')
 const form = ref({ name: '', order_num: 0 })
+
+// AI 出题
+const showGenerate = ref(false)
+const generating = ref(false)
+const genTarget = ref(null)
+const genResult = ref(null)
+const genForm = ref({ count: 5, difficulty: 3 })
+const difficultyOptions = [
+  { value: 1, label: '1 · 很简单' },
+  { value: 2, label: '2 · 简单' },
+  { value: 3, label: '3 · 中等' },
+  { value: 4, label: '4 · 较难' },
+  { value: 5, label: '5 · 很难' }
+]
+
+const openGenerate = (row) => {
+  genTarget.value = row
+  genResult.value = null
+  genForm.value = { count: 5, difficulty: 3 }
+  showGenerate.value = true
+}
+
+const submitGenerate = async () => {
+  generating.value = true
+  genResult.value = null
+  try {
+    const res = await generateChapterQuestions(genTarget.value.id, genForm.value)
+    genResult.value = res.data
+    ElMessage.success(`已生成 ${res.data.generated} 道题`)
+  } catch (error) {
+    const detail = error.response?.data?.detail
+    ElMessage.error(detail || '生成失败，请稍后重试')
+  } finally {
+    generating.value = false
+  }
+}
 
 onMounted(() => {
   loadChapters()
