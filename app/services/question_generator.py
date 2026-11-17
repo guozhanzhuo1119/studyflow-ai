@@ -152,7 +152,7 @@ def _validate(item: GeneratedQuestion) -> Tuple[Dict | None, str]:
 
     if not all(options):
         return None, '选项不全'
-    if answer not in 'ABCD':
+    if answer not in ('A', 'B', 'C', 'D'):
         return None, '答案不合法'
     if len(re.sub(r'\s+', '', title)) < MIN_TITLE:
         return None, '题干不足 8 字'
