@@ -48,8 +48,8 @@ studyflow:
     secret: ${JWT_SECRET:your-secret-key-change-in-production}
     expire-minutes: 10080
   uploads-dir: ${UPLOADS_DIR:uploads}
-  # 预留 frontend/dist 托管；为空则不挂载（本地可设为 ../代码/frontend/dist 试切流）
-  frontend-dist: ${FRONTEND_DIST:}
+  # 外置托管前端 dist（相对 studyflow-java 工作目录）；可用 FRONTEND_DIST 覆盖
+  frontend-dist: ${FRONTEND_DIST:../frontend/dist}
   ai:
     base-url: ${AI_BASE_URL:http://127.0.0.1:8001}
     internal-token: ${AI_INTERNAL_TOKEN:studyflow-dev-token}

@@ -257,3 +257,97 @@ java -jar target/studyflow-java-0.0.1-SNAPSHOT.jar
 - 脚本使用随机 fixture ID，结束后清理测试 attempts/wrong_book/error_analyses；
   不会动 P4 的教材/科目/题目数据。当前库基线恢复为
   attempts=15、wrong_book=3、error_analyses=1。
+
+---
+
+# P5 实现备注（2026-11-19）
+
+## 1. 前端搬迁
+
+- 从 `代码/frontend` 工作区复制到根目录 `frontend/`，排除 `node_modules/`、`dist/`、`.idea/`、`.vscode/`。
+- `代码/` 保持只读，未修改。
+- 与旧目录逐文件 diff 后，只有 4 个文件变化：
+  `vite.config.js`、`src/api/index.js`、`src/views/ChapterList.vue`、`src/views/SubjectList.vue`。
+  聊天、错题本、错因、变式、搜索页面一行未动。
+
+## 2. 切流改动
+
+- `vite.config.js`：`/api` 与 `/uploads` 代理 target 从 `localhost:8002` 改为 `localhost:8080`。
+  `/uploads` 也必须切，否则 dev 下图片仍去旧服务。
+- `src/api/index.js`：`baseURL` 保持 `/api` 不变；出题 POST 去掉 130s 同步超时；
+  新增 `getAiJob(jobId)` 与 `waitForAiJob()`，每 1.5s 轮询 `GET /api/ai-jobs/{id}`，
+  success 返回 job，failed 抛出后端 `error`，超过 6 分钟提示超时。
+- `ChapterList.vue` / `SubjectList.vue`：
+  - POST 拿 `job_id` → 轮询 → success 刷新章节/题目树；
+  - failed 优先显示后端 `error`，再退到 HTTP `detail`；
+  - 按钮保留 loading，提示改为「AI 出题中，约 1~2 分钟」；生成中禁用关闭/取消。
+- 教材上传保持原样：Java `POST /api/materials/upload` 同步返回已解析的 material，
+  大纲通过 `GET /api/materials/{id}/outline` 从 Java 库读取，不需要轮询。
+- 代码中已无 `8002` / `localhost:8001` 引用（grep 验证）。
+
+## 3. dist 托管（选择外置目录）
+
+- 选择**外置目录**，不把 `dist` 放进 `src/main/resources/static`。
+  理由：避免把 5MB 构建产物提交进仓库/打进 jar；前端可独立构建，Java 重启即可加载新文件。
+- `application.yml`：`studyflow.frontend-dist: ${FRONTEND_DIST:../frontend/dist}`。
+  默认相对 `studyflow-java/` 工作目录；也可用 `FRONTEND_DIST` 覆盖。
+- 新增 `FrontendController`：把 `/`、`/login` 及 `/subjects/**` 等 history 路由
+  forward 到 `/index.html`（资源映射本身不会自动处理目录首页）。
+  `/api/**`、`/uploads/**` 不受影响。
+- 构建：
+  ```bash
+  cd frontend
+  npm ci
+  npm run build
+  ```
+  `frontend/dist` 已被 gitignore；全新环境必须先 build。
+- 启动（从 `studyflow-java/`）：
+  ```bash
+  java -jar target/studyflow-java-0.0.1-SNAPSHOT.jar
+  ```
+  实测 `GET /`、`GET /login` 均 200，静态 JS/CSS 200，`GET /api/subjects` 仍 200。
+  若从仓库根目录启动，设置 `FRONTEND_DIST=frontend/dist`。
+
+## 4. 回归结果（curl + headless Chrome）
+
+- 登录：`POST /api/auth/login` 返回 access_token/user_id/username。
+- 科目树：8 个科目；P4 科目下 2 章节；第一章 2 个知识点、每题列表不带 answer/explanation。
+- 判分：answer=C 的题提交 `["C"]` → correct，`["A"]` → wrong；wrong_book 出现该题且层级完整。
+- 错因：meta 6 类/6 步；六条决策分支全部返回正确类型；创建/PUT/删除/统计均 200。
+- 出题轮询：`job-d794056c` → success，generated=1, dropped=0；第二章新增 1 题。
+- 教材大纲：`GET /api/materials/{id}/outline` 返回 2 章扁平数组。
+- 聊天：`session-c96d8ade` 返回心月狐回复，消息 2 条。
+- 变式：列表返回已有 var；`POST /api/recommend` 返回 recommendations。
+- 搜索：`POST /api/problems/search` 命中 2 道行列式题。
+- 构建：`npm run build` 成功（vite 8.3.6，1921 modules）。
+- Dev 代理：Vite 3000 → `/api/subjects` 返回 8；`/uploads/...` 200。
+- Headless Chrome 打开 `http://localhost:8080/`：渲染出登录页（用户名输入框、登录按钮）。
+
+P5 回归留下的演示数据：
+- `prob-669c15cd` 有 1 次 correct + 1 次 wrong，wrong_book 有一行（id 12）；
+- 第二章矩阵新增 `kp-afdfb97b` / `prob-f1818b8b`；
+- 聊天会话 `session-c96d8ade`（2 条消息）。
+当前 attempts=17、wrong_book=4、error_analyses=1，未清理，便于手工点选验证。
+
+## 5. 发现但未擅自补的接口
+
+原前端还有 3 个辅助功能调用旧 Python 的 Java 未实现接口；它们不在 P5 手工回归清单中，
+按“只做切流、发现必须改先停下”的要求没有自行补：
+
+| 前端调用 | 当前 Java | 影响 |
+|---|---|---|
+| `POST /api/upload`（题目/变题编辑器插入图片） | 404 | 图片上传按钮失败 |
+| `POST /api/problems/import`（题目批量导入） | 405 | 批量导入按钮失败 |
+| `POST /api/materials/text`（教材粘贴文字导入） | 405 | 知识库“粘贴文字导入”失败 |
+| `POST /api/attempts` 传 `result=giveup`（题目列表「放弃」按钮） | 400 | P2 按工作区版本只接受 correct/wrong；该按钮是旧前端遗留 |
+
+聊天、错题本、错因、变式、搜索本身的接口均已对齐，不需要改前端。
+如需补齐这些遗留项，建议单独做一小段后端改动并补验收；不要在 P5 里顺手改前端去“适配”。
+
+## 6. 回退方式
+
+- 开发环境：把 `frontend/vite.config.js` 的 `/api`、`/uploads` target 改回
+  `http://localhost:8002`，启动旧 FastAPI 即可。
+- 旧前端源码仍在 `代码/frontend/`，完整未动。
+- 旧构建产物仍在 `代码/frontend/dist/`，可直接由旧 FastAPI 托管。
+- Java 侧可停止，不影响旧服务回退。
