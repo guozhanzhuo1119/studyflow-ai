@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>学流智学 · 原型总览</title>
+<style>
+:root{
+  --bg:#1A1D24; --panel:rgba(255,255,255,.045); --line:rgba(255,255,255,.08);
+  --mint:#5AE3D0; --mint-dim:rgba(90,227,208,.12); --mint-line:rgba(90,227,208,.3);
+  --text:#E7EAF0; --dim:#98A1AF; --muted:#6B7382;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
+.grid-bg{position:fixed;inset:0;z-index:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.022) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.022) 1px,transparent 1px);background-size:44px 44px;mask-image:radial-gradient(ellipse at 50% 0%,#000 20%,transparent 85%)}
+.wrap{position:relative;z-index:1;max-width:1240px;margin:0 auto;padding:44px 28px 80px}
+.top{display:flex;align-items:flex-end;justify-content:space-between;gap:24px;flex-wrap:wrap;padding-bottom:22px;border-bottom:1px solid var(--line)}
+h1{margin:0 0 8px;font-size:26px;font-weight:600;letter-spacing:.5px}
+.sub{font-size:13px;color:var(--dim);line-height:1.8}
+.sub b{color:var(--mint);font-weight:500}
+.actions{display:flex;gap:10px}
+.btn{padding:9px 16px;border-radius:9px;border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--dim);font-size:13px;text-decoration:none;transition:.16s}
+.btn:hover{color:var(--text);border-color:rgba(255,255,255,.2)}
+.btn.main{border-color:rgba(90,227,208,.4);background:rgba(90,227,208,.1);color:var(--mint)}
+.btn.main:hover{background:rgba(90,227,208,.18);box-shadow:0 0 18px rgba(90,227,208,.12)}
+.flow{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:28px 0 36px}
+.step{position:relative;padding:14px 16px;border-radius:10px;border:1px solid var(--line);background:var(--panel)}
+.step .n{font-size:11px;color:var(--mint);letter-spacing:1px;margin-bottom:6px}
+.step .t{font-size:13.5px;margin-bottom:4px}
+.step .d{font-size:11.5px;color:var(--muted);line-height:1.7}
+.section{margin-top:34px}
+.sec-head{display:flex;align-items:baseline;gap:12px;margin-bottom:14px}
+.sec-head h2{margin:0;font-size:16px;font-weight:600}
+.sec-head span{font-size:12px;color:var(--muted)}
+.shots{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.shot{border-radius:12px;border:1px solid var(--line);background:var(--panel);overflow:hidden;transition:transform .18s,border-color .18s,box-shadow .18s;cursor:zoom-in}
+.shot:hover{transform:translateY(-3px);border-color:var(--mint-line);box-shadow:0 16px 36px rgba(0,0,0,.4)}
+.shot img{display:block;width:100%;height:auto}
+.shot .cap{padding:12px 14px;border-top:1px solid var(--line)}
+.shot .cap b{display:block;font-size:13.5px;font-weight:500;margin-bottom:5px}
+.shot .cap p{margin:0;font-size:12px;color:var(--muted);line-height:1.7}
+.note{margin-top:30px;padding:16px 18px;border-radius:10px;border:1px solid rgba(90,227,208,.18);background:rgba(90,227,208,.05);font-size:12.5px;color:var(--dim);line-height:1.9}
+.note b{color:var(--mint);font-weight:600}
+.lb{position:fixed;inset:0;z-index:50;display:none;place-items:center;background:rgba(10,12,16,.86);backdrop-filter:blur(6px);padding:40px}
+.lb.open{display:grid}
+.lb img{max-width:94vw;max-height:88vh;border-radius:10px;border:1px solid var(--mint-line);box-shadow:0 24px 60px rgba(0,0,0,.6)}
+@media (max-width:820px){
+  .flow{grid-template-columns:repeat(2,1fr)}
+  .shots{grid-template-columns:1fr}
+  .wrap{padding:28px 18px 60px}
+}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+
+<div class="wrap">
+  <div class="top">
+    <div>
+      <h1>学流智学 · 前端原型</h1>
+      <div class="sub">
+        题库刷题 + 情感陪伴的桌面端学习工作台 &nbsp;·&nbsp; 纯静态实现，可真实跳转 &nbsp;·&nbsp;
+        <b>共 2 个页面 + 1 个 AI 情感助手</b>
+      </div>
+    </div>
+    <div class="actions">
+      <a class="btn" href="quiz.html?q=6">打开做题页</a>
+      <a class="btn main" href="index.html">打开主页面 →</a>
+    </div>
+  </div>
+
+  <div class="flow">
+    <div class="step"><div class="n">STEP 01</div><div class="t">选择章节</div><div class="d">左侧工程树点章节文件夹，右侧加载对应题目</div></div>
+    <div class="step"><div class="n">STEP 02</div><div class="t">进入做题</div><div class="d">点题目文件或「开始做题」，跳转全屏专注页</div></div>
+    <div class="step"><div class="n">STEP 03</div><div class="t">情绪陪伴</div><div class="d">点右下角心月狐，倾诉焦虑并拿到微行动卡片</div></div>
+    <div class="step"><div class="n">STEP 04</div><div class="t">微行动</div><div class="d">一键跳到 2 道简单极限题，做完返回题库</div></div>
+  </div>
+
+  <div class="section">
+    <div class="sec-head"><h2>页面 A · 题库工作台</h2><span>index.html</span></div>
+    <div class="shots">
+      <div class="shot">
+        <img src="原型截图/01-题库主页-宽屏.png" alt="题库主页">
+        <div class="cap">
+          <b>IDE 式三区布局</b>
+          <p>左侧仿 PyCharm 工程树（科目 / 章节 / 题目文件）、中间题目卡片流、底部状态栏；卡片悬停上浮，「查看解析」平滑展开。</p>
+        </div>
+      </div>
+      <div class="shot">
+        <img src="原型截图/04-窄屏自适应.png" alt="窄屏自适应">
+        <div class="cap">
+          <b>窄屏自适应</b>
+          <p>侧栏只缩窄不消失，底部「外部库 / 临时文件和控制台」固定，符合 IDE 使用习惯。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="sec-head"><h2>AI 情感助手 · 心月狐</h2><span>全局悬浮球</span></div>
+    <div class="shots">
+      <div class="shot">
+        <img src="原型截图/02-心月狐陪伴对话与行动卡片.png" alt="心月狐对话">
+        <div class="cap">
+          <b>呼吸灯悬浮球 + 陪伴对话</b>
+          <p>点击展开聊天窗，内置「我好焦虑做不出来」对话与呼吸引导，并给出可点击的微行动卡片。</p>
+        </div>
+      </div>
+      <div class="shot">
+        <img src="原型截图/03-行动卡片跳转做题页.png" alt="行动卡片跳转">
+        <div class="cap">
+          <b>微行动闭环</b>
+          <p>点击「去做 2 道简单的极限题」直接进入做题页对应题目，完成后返回题库更新进度。</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note">
+    <b>交付说明</b> · 原型为纯静态实现（HTML / CSS / JS），无需安装依赖，双击 <b>index.html</b> 即可演示。
+    角色立绘位于 <b>assets/xinyuehu.png</b>，替换同名文件即可换人设；答题进度存于浏览器 localStorage。
+  </div>
+</div>
+
+<div class="lb" id="lb"><img id="lbImg" src="" alt=""></div>
+<script>
+document.querySelectorAll(".shot").forEach(function(el){
+  el.addEventListener("click", function(){
+    var img = el.querySelector("img");
+    document.getElementById("lbImg").src = img.src;
+    document.getElementById("lb").classList.add("open");
+  });
+});
+document.getElementById("lb").addEventListener("click", function(){
+  this.classList.remove("open");
+});
+document.addEventListener("keydown", function(e){
+  if(e.key === "Escape") document.getElementById("lb").classList.remove("open");
+});
+</script>
+</body>
+</html>

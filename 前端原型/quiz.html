@@ -1,0 +1,434 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>学流智学 · 专注做题</title>
+<style>
+:root{
+  --bg:#1A1D24; --panel:rgba(255,255,255,.045); --panel-2:rgba(255,255,255,.07);
+  --line:rgba(255,255,255,.075); --line-2:rgba(255,255,255,.13);
+  --mint:#5AE3D0; --mint-dim:rgba(90,227,208,.12); --mint-line:rgba(90,227,208,.28);
+  --text:#E7EAF0; --dim:#98A1AF; --muted:#6B7382;
+  --amber:#E7C07B; --rose:#E39A9A;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--text);font-family:"PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;font-size:14px;-webkit-font-smoothing:antialiased;overflow:hidden}
+.grid-bg{position:fixed;inset:0;z-index:0;pointer-events:none;background-image:linear-gradient(rgba(255,255,255,.022) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.022) 1px,transparent 1px);background-size:44px 44px;mask-image:radial-gradient(ellipse at 50% 10%,#000 25%,transparent 88%)}
+.glow{position:fixed;z-index:0;width:620px;height:620px;top:-300px;left:50%;transform:translateX(-50%);border-radius:50%;background:rgba(90,227,208,.05);filter:blur(130px);pointer-events:none}
+
+.focus-bar{position:relative;z-index:5;height:56px;display:flex;align-items:center;gap:18px;padding:0 20px;border-bottom:1px solid var(--line);background:rgba(26,29,36,.74);backdrop-filter:blur(18px)}
+.back-btn{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:8px;border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--dim);font-size:13px;font-family:inherit;cursor:pointer;transition:.16s}
+.back-btn:hover{color:var(--text);border-color:var(--mint-line);background:var(--mint-dim)}
+.back-btn svg{transition:transform .16s}
+.back-btn:hover svg{transform:translateX(-2px)}
+.bar-center{display:flex;align-items:center;gap:12px;margin:0 auto;font-size:12.5px;color:var(--dim)}
+.bar-center b{color:var(--text);font-weight:500}
+.segs{display:flex;gap:4px}
+.seg{width:26px;height:4px;border-radius:2px;background:rgba(255,255,255,.1);transition:.2s}
+.seg.past{background:rgba(90,227,208,.34)}
+.seg.active{background:var(--mint);box-shadow:0 0 8px rgba(90,227,208,.4)}
+.timer{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--dim);font-variant-numeric:tabular-nums;padding:6px 12px;border:1px solid var(--line);border-radius:8px}
+.mode-tag{font-size:11.5px;color:var(--mint);padding:4px 10px;border-radius:99px;border:1px solid var(--mint-line);background:var(--mint-dim)}
+
+.quiz-main{position:relative;z-index:1;height:calc(100vh - 56px);overflow:auto;display:flex;justify-content:center;padding:30px 20px 70px}
+.quiz-card{width:min(784px,100%);height:fit-content;padding:28px 32px 26px;border-radius:16px;border:1px solid var(--line);background:var(--panel);backdrop-filter:blur(18px);box-shadow:0 22px 54px rgba(0,0,0,.32)}
+.quiz-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:14px}
+.tag{font-size:11.5px;padding:2px 8px;border-radius:6px;border:1px solid var(--line);color:var(--dim)}
+.tag.lv1{color:var(--mint);border-color:rgba(90,227,208,.24);background:rgba(90,227,208,.07)}
+.tag.lv2{color:var(--amber);border-color:rgba(231,192,123,.24);background:rgba(231,192,123,.07)}
+.tag.lv3{color:var(--rose);border-color:rgba(227,154,154,.24);background:rgba(227,154,154,.07)}
+.meta-right{margin-left:auto;font-size:11.5px;color:var(--muted)}
+.stem{margin:0 0 22px;font-size:17px;font-weight:500;line-height:1.85;letter-spacing:.2px}
+.options{display:flex;flex-direction:column;gap:10px}
+.option{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.025);cursor:pointer;transition:.16s;user-select:none}
+.option:hover{border-color:var(--line-2);background:rgba(255,255,255,.045)}
+.option.selected{border-color:rgba(90,227,208,.55);background:rgba(90,227,208,.08)}
+.opt-key{flex:none;width:24px;height:24px;margin-top:1px;display:grid;place-items:center;border-radius:6px;border:1px solid var(--line);color:var(--dim);font-size:12px;transition:.16s}
+.option.selected .opt-key{background:var(--mint);border-color:var(--mint);color:#0C1A18}
+.opt-text{font-size:14.5px;line-height:1.65;color:var(--text)}
+.option.correct{border-color:rgba(90,227,208,.6);background:rgba(90,227,208,.1)}
+.option.correct .opt-key{background:var(--mint);border-color:var(--mint);color:#0C1A18}
+.option.wrong{border-color:rgba(227,154,154,.55);background:rgba(227,154,154,.08)}
+.option.wrong .opt-key{background:rgba(227,154,154,.9);border-color:transparent;color:#20100F}
+.options.locked .option{cursor:default}
+
+.quiz-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:24px;padding-top:18px;border-top:1px dashed var(--line)}
+.hint-btn{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--dim);font-size:12.5px;font-family:inherit;cursor:pointer;transition:.16s}
+.hint-btn:hover{color:var(--mint);border-color:var(--mint-line);background:var(--mint-dim)}
+.action-right{display:flex;align-items:center;gap:10px;margin-left:auto}
+.pass-btn{padding:9px 18px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--dim);font-size:13px;font-family:inherit;cursor:pointer}
+.pass-btn:hover{color:var(--text);border-color:var(--line-2)}
+.submit-btn{padding:10px 28px;border-radius:9px;border:1px solid var(--mint);background:rgba(90,227,208,.16);color:var(--mint);font-size:14px;font-family:inherit;cursor:pointer;transition:.16s}
+.submit-btn:disabled{opacity:.35;cursor:not-allowed}
+.submit-btn:not(:disabled):hover{background:rgba(90,227,208,.26);box-shadow:0 0 22px rgba(90,227,208,.16)}
+
+.result{display:none;margin-top:20px;padding:16px 18px;border-radius:12px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+.result.show{display:block;animation:fade .25s ease}
+.result.ok{border-color:rgba(90,227,208,.3);background:rgba(90,227,208,.06)}
+.result.bad{border-color:rgba(227,154,154,.28);background:rgba(227,154,154,.06)}
+@keyframes fade{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+.result-title{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;margin-bottom:8px}
+.result.ok .result-title{color:var(--mint)}
+.result.bad .result-title{color:var(--rose)}
+.explain{font-size:13.5px;line-height:1.85;color:var(--dim)}
+.explain b{color:var(--text);font-weight:500}
+
+.ai-ball{position:fixed;z-index:20;right:26px;bottom:26px;width:54px;height:54px;border-radius:50%;display:grid;place-items:center;cursor:pointer;border:1px solid rgba(90,227,208,.4);background:radial-gradient(circle at 34% 28%,rgba(90,227,208,.26),rgba(90,227,208,.07) 72%);box-shadow:0 0 0 6px rgba(90,227,208,.035),0 10px 26px rgba(0,0,0,.42);transition:transform .18s,box-shadow .18s}
+.ai-ball:hover{transform:translateY(-2px);box-shadow:0 0 0 8px rgba(90,227,208,.05),0 14px 30px rgba(0,0,0,.45)}
+.ai-ball::before{content:"";position:absolute;inset:-7px;border-radius:50%;border:1px solid rgba(90,227,208,.16);animation:pulse 3.4s ease-out infinite}
+@keyframes pulse{0%{transform:scale(.9);opacity:.8}70%{transform:scale(1.16);opacity:0}100%{opacity:0}}
+.ai-clip{display:block;width:100%;height:100%;border-radius:50%;overflow:hidden}
+.ai-face{display:block;width:100%;height:100%;object-fit:cover;object-position:50% 16%;transform:scale(1.04)}
+.ai-ball{animation:breathe 4.2s ease-in-out infinite}
+@keyframes breathe{0%,100%{box-shadow:0 0 0 6px rgba(90,227,208,.03),0 10px 26px rgba(0,0,0,.42)}50%{box-shadow:0 0 0 9px rgba(90,227,208,.09),0 10px 30px rgba(90,227,208,.14)}}
+.ai-ball-dot{position:absolute;right:2px;bottom:2px;width:12px;height:12px;border-radius:50%;background:var(--mint);border:2px solid #1A1D24;box-shadow:0 0 6px rgba(90,227,208,.7);animation:blink 2.6s ease-in-out infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.45}}
+.ai-ball-dot{position:absolute;right:2px;bottom:2px;width:12px;height:12px;border-radius:50%;background:var(--mint);border:2px solid #1A1D24;box-shadow:0 0 6px rgba(90,227,208,.7)}
+.ai-head .ai-head-face{width:32px;height:32px;border-radius:50%;object-fit:cover;object-position:50% 15%;border:1px solid rgba(90,227,208,.35);flex:none}
+.ai-head .ai-name{font-weight:500}
+.ai-role{font-size:11px;color:var(--muted);margin-left:-2px}
+
+.ai-panel{position:fixed;z-index:21;right:26px;bottom:92px;width:332px;height:430px;display:flex;flex-direction:column;overflow:hidden;border-radius:14px;border:1px solid var(--mint-line);background:rgba(28,32,40,.74);backdrop-filter:blur(22px);box-shadow:0 20px 50px rgba(0,0,0,.5);opacity:0;transform:translateY(10px) scale(.98);pointer-events:none;transition:.2s ease}
+.ai-panel.open{opacity:1;transform:none;pointer-events:auto}
+.ai-head{display:flex;align-items:center;gap:8px;padding:12px 14px;border-bottom:1px solid var(--line);font-size:13px}
+.ai-name{font-weight:500}
+.ai-state{font-size:11px;color:var(--mint);display:inline-flex;align-items:center;gap:5px}
+.ai-state::before{content:"";width:5px;height:5px;border-radius:50%;background:var(--mint);box-shadow:0 0 6px rgba(90,227,208,.6)}
+.ai-close{margin-left:auto;background:none;border:0;color:var(--muted);cursor:pointer;font-size:16px;line-height:1;padding:4px}
+.ai-close:hover{color:var(--text)}
+.ai-body{flex:1;overflow:auto;padding:12px 14px;display:flex;flex-direction:column;gap:10px}
+.ai-body::-webkit-scrollbar{width:4px}
+.ai-body::-webkit-scrollbar-thumb{background:rgba(255,255,255,.12);border-radius:2px}
+.msg{max-width:87%;padding:9px 12px;border-radius:10px;font-size:13px;line-height:1.65}
+.msg.bot{align-self:flex-start;background:rgba(255,255,255,.05);border:1px solid var(--line);border-top-left-radius:4px}
+.msg.me{align-self:flex-end;background:rgba(90,227,208,.14);border:1px solid rgba(90,227,208,.22);color:#DDFBF6;border-top-right-radius:4px}
+.quick{display:flex;flex-wrap:wrap;gap:6px;padding:0 14px 10px}
+.quick button{padding:5px 10px;border-radius:99px;border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--dim);font-size:11.5px;font-family:inherit;cursor:pointer;transition:.14s}
+.quick button:hover{color:var(--mint);border-color:var(--mint-line);background:var(--mint-dim)}
+.ai-input{display:flex;gap:8px;padding:10px 12px;border-top:1px solid var(--line)}
+.ai-input input{flex:1;min-width:0;padding:8px 10px;border-radius:8px;border:1px solid var(--line);background:rgba(255,255,255,.04);color:var(--text);font-size:12.5px;font-family:inherit;outline:none}
+.ai-input input::placeholder{color:var(--muted)}
+.ai-input input:focus{border-color:var(--mint-line)}
+.ai-send{padding:8px 14px;border-radius:8px;border:1px solid rgba(90,227,208,.4);background:rgba(90,227,208,.12);color:var(--mint);font-size:12.5px;font-family:inherit;cursor:pointer}
+
+@media (max-width:760px){
+  .quiz-card{padding:22px 18px}
+  .stem{font-size:16px}
+  .bar-center{display:none}
+  .mode-tag{display:none}
+  .timer{font-size:11.5px;padding:6px 8px}
+}
+</style>
+</head>
+<body>
+<div class="grid-bg"></div>
+<div class="glow"></div>
+
+<header class="focus-bar">
+  <button class="back-btn" id="backBtn">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H6M11 6l-6 6 6 6"/></svg>
+    返回题库
+  </button>
+  <div class="bar-center">
+    <span>第 <b id="qIndex">1</b> 题 / 共 <b id="qTotal">5</b> 题</span>
+    <div class="segs" id="segs"></div>
+  </div>
+  <span class="mode-tag">专注模式</span>
+  <div class="timer">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><circle cx="12" cy="13" r="8"/><path d="M12 9v4.2l2.6 1.6M9 2.5h6"/></svg>
+    <span id="timer">00:00</span>
+  </div>
+</header>
+
+<main class="quiz-main">
+  <article class="quiz-card">
+    <div class="quiz-meta" id="quizMeta"></div>
+    <h1 class="stem" id="stem"></h1>
+    <div class="options" id="options"></div>
+
+    <div class="quiz-actions">
+      <button class="hint-btn" id="hintBtn">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.6.5.9 1.1.9 1.8V16h5.4v-.4c0-.7.3-1.3.9-1.8A6 6 0 0 0 12 3Z"/></svg>
+        需要提示
+      </button>
+      <div class="action-right">
+        <button class="pass-btn" id="passBtn">跳过本题</button>
+        <button class="submit-btn" id="submitBtn" disabled>提交答案</button>
+      </div>
+    </div>
+
+    <div class="result" id="result">
+      <div class="result-title" id="resultTitle"></div>
+      <div class="explain" id="explain"></div>
+    </div>
+  </article>
+</main>
+
+<div class="ai-ball" id="aiBall" title="和心月狐聊聊">
+  <span class="ai-clip"><img class="ai-face" src="assets/xinyuehu.png" alt="心月狐"></span>
+  <span class="ai-ball-dot"></span>
+</div>
+
+<div class="ai-panel" id="aiPanel">
+  <div class="ai-head">
+    <img class="ai-head-face" src="assets/xinyuehu.png" alt="心月狐">
+    <span class="ai-name">心月狐</span>
+    <span class="ai-role">情感陪伴 · 学习陪练</span>
+    <span class="ai-state">在线</span>
+    <button class="ai-close" id="aiClose" title="收起">×</button>
+  </div>
+  <div class="ai-body" id="aiBody"></div>
+  <div class="quick" id="aiQuick">
+    <button data-q="给我一点提示">给我提示</button>
+    <button data-q="讲解一下这道题考查的知识点">讲解知识点</button>
+    <button data-q="帮我制定一个复习计划">复习计划</button>
+  </div>
+  <div class="ai-input">
+    <input id="aiInput" type="text" placeholder="向心月狐倾诉或提问…" />
+    <button class="ai-send" id="aiSend">发送</button>
+  </div>
+</div>
+
+<script>
+const QUESTIONS = [
+  { id:1, chapter:"第一章 线性表", level:"入门", levelKey:"lv1", type:"单选题",
+    title:"在单链表中，若指针 p 指向某个结点，要在 p 之后插入新结点 s，正确的操作顺序是？",
+    tags:["链表","指针"], time:"2 分钟", rate:"68%",
+    options:["s 的后继指向 p 的后继，再让 p 的后继指向 s","先让 p 的后继指向 s，再让 s 的后继指向 p 的后继","让 s 的后继指向 p，再让 p 的后继指向 s","先让 p 的后继指向 s 的后继，再让 s 的后继指向 p"],
+    answer:0,
+    explain:"插入操作必须先保住 p 原来的后继：先执行「s 的后继 = p 的后继」，再执行「p 的后继 = s」。如果顺序反过来，p 原本的后继会丢失，链表从此断开。" },
+  { id:2, chapter:"第一章 线性表", level:"进阶", levelKey:"lv2", type:"单选题",
+    title:"元素 1、2、3、4 依次入栈，入栈过程中允许出栈，则下列哪个出栈序列不可能出现？",
+    tags:["栈"], time:"3 分钟", rate:"52%",
+    options:["1、2、3、4","4、3、2、1","3、1、2、4","2、3、4、1"],
+    answer:2,
+    explain:"当 3 出栈时，1 和 2 都已压在栈中，且 2 位于 1 之上。栈的后进先出特性决定了必须先弹出 2 才能弹出 1，所以「3、1、2、4」不可能出现。" },
+  { id:3, chapter:"第二章 树与图", level:"进阶", levelKey:"lv2", type:"单选题",
+    title:"一棵完全二叉树共有 1000 个结点，则它的叶子结点个数是？",
+    tags:["二叉树","性质"], time:"3 分钟", rate:"47%",
+    options:["500","489","512","511"],
+    answer:0,
+    explain:"完全二叉树中，度为 0 的结点数满足「叶子数 = 向下取整((结点总数 + 1) / 2)」。代入 1000 得 500，因此叶子结点共 500 个。" },
+  { id:4, chapter:"第三章 排序与查找", level:"挑战", levelKey:"lv3", type:"单选题",
+    title:"下列排序算法中，在最坏情况下时间复杂度仍为 O(n log n) 的是？",
+    tags:["归并排序","复杂度"], time:"2 分钟", rate:"61%",
+    options:["快速排序","归并排序","插入排序","冒泡排序"],
+    answer:1,
+    explain:"归并排序的拆分与合并层数固定为 log n 层，每层合并代价为 O(n)，最好、最坏、平均都是 O(n log n)。快速排序在最坏情况（如已有序且基准选择不当）会退化为 O(n²)。" },
+  { id:5, chapter:"第一章 线性表", level:"入门", levelKey:"lv1", type:"单选题",
+    title:"与链表相比，关于顺序表的描述正确的是？",
+    tags:["顺序表","存储结构"], time:"2 分钟", rate:"73%",
+    options:["支持按下标随机访问，但插入和删除平均需要移动元素","支持随机访问，且插入删除不需要移动元素","插入删除效率一定高于链表","必须预先分配固定空间，无法动态扩容"],
+    answer:0,
+    explain:"顺序表用连续空间存储，可按 O(1) 随机访问；但插入、删除需要移动后续元素，平均代价 O(n)。现代实现可以动态扩容，因此「无法扩容」的说法不成立。" },
+  { id:6, chapter:"第一章 极限", level:"入门", levelKey:"lv1", type:"单选题",
+    title:"极限 lim(x→0) sin(3x) / x 的值是？",
+    tags:["极限","重要极限"], time:"2 分钟", rate:"81%",
+    options:["1","3","1/3","0"],
+    answer:1,
+    explain:"利用第一个重要极限 lim(t→0) sin t / t = 1。把分子分母同乘 3，凑成 sin(3x)/(3x) × 3，前者趋于 1，所以整个极限等于 3。" },
+  { id:7, chapter:"第一章 极限", level:"入门", levelKey:"lv1", type:"单选题",
+    title:"极限 lim(x→∞) (1 + 1/x)^x 的值是？",
+    tags:["极限","重要极限"], time:"2 分钟", rate:"78%",
+    options:["e","1","0","无穷大"],
+    answer:0,
+    explain:"这是第二个重要极限，lim(x→∞) (1 + 1/x)^x = e ≈ 2.718。它的变形式 (1 + 1/n)^n 也常出现在数列极限题里，记住结构就能秒判。" }
+];
+
+const STORE_KEY = "studyflow_progress";
+function loadProgress(){
+  try { return JSON.parse(localStorage.getItem(STORE_KEY) || "{}"); } catch(e){ return {}; }
+}
+function saveProgress(p){
+  try { localStorage.setItem(STORE_KEY, JSON.stringify(p)); } catch(e){}
+}
+
+const params = new URLSearchParams(location.search);
+const wanted = Number(params.get("q"));
+let currentIndex = Math.max(0, QUESTIONS.findIndex(q => q.id === wanted));
+if(currentIndex < 0) currentIndex = 0;
+
+let current = QUESTIONS[currentIndex];
+let selected = -1;
+let submitted = false;
+const progress = loadProgress();
+
+const stemEl = document.getElementById("stem");
+const optionsEl = document.getElementById("options");
+const metaEl = document.getElementById("quizMeta");
+const submitBtn = document.getElementById("submitBtn");
+const resultEl = document.getElementById("result");
+const resultTitle = document.getElementById("resultTitle");
+const explainEl = document.getElementById("explain");
+const segsEl = document.getElementById("segs");
+
+function renderSegs(){
+  segsEl.innerHTML = QUESTIONS.map((q, i) => {
+    let cls = "seg";
+    if(i < currentIndex) cls += " past";
+    if(i === currentIndex) cls += " active";
+    return `<span class="${cls}"></span>`;
+  }).join("");
+}
+
+function renderQuestion(){
+  current = QUESTIONS[currentIndex];
+  selected = -1;
+  submitted = false;
+
+  document.getElementById("qIndex").textContent = currentIndex + 1;
+  document.getElementById("qTotal").textContent = QUESTIONS.length;
+  renderSegs();
+
+  metaEl.innerHTML = `
+    <span class="tag ${current.levelKey}">${current.level}</span>
+    <span class="tag">${current.type}</span>
+    ${current.tags.map(t => `<span class="tag">${t}</span>`).join("")}
+    <span class="tag">${current.chapter}</span>
+    <span class="meta-right">全站正确率 ${current.rate} · 预计 ${current.time}</span>`;
+
+  stemEl.textContent = current.title;
+  optionsEl.classList.remove("locked");
+  optionsEl.innerHTML = current.options.map((text, i) => `
+    <div class="option" data-index="${i}">
+      <span class="opt-key">${i + 1}</span>
+      <span class="opt-text">${text}</span>
+    </div>`).join("");
+
+  optionsEl.querySelectorAll(".option").forEach(el => {
+    el.addEventListener("click", () => {
+      if(submitted) return;
+      selected = Number(el.dataset.index);
+      optionsEl.querySelectorAll(".option").forEach(o => o.classList.remove("selected"));
+      el.classList.add("selected");
+      submitBtn.disabled = false;
+    });
+  });
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = "提交答案";
+  resultEl.className = "result";
+  resultEl.classList.remove("show");
+}
+
+function submitAnswer(){
+  if(submitted || selected < 0) return;
+  submitted = true;
+  const correct = selected === current.answer;
+  const p = loadProgress();
+  p[current.id] = correct ? "correct" : "wrong";
+  saveProgress(p);
+
+  optionsEl.classList.add("locked");
+  optionsEl.querySelectorAll(".option").forEach(el => {
+    const i = Number(el.dataset.index);
+    el.classList.remove("selected");
+    if(i === current.answer) el.classList.add("correct");
+    else if(i === selected) el.classList.add("wrong");
+  });
+
+  resultEl.className = "result show " + (correct ? "ok" : "bad");
+  resultTitle.textContent = correct ? "回答正确 · 思路很清晰" : "回答错误 · 正确答案是 " + (current.answer + 1);
+  explainEl.innerHTML = "<b>解析：</b>" + current.explain;
+
+  const last = currentIndex === QUESTIONS.length - 1;
+  submitBtn.textContent = last ? "完成练习" : "下一题";
+  submitBtn.disabled = false;
+}
+
+submitBtn.addEventListener("click", () => {
+  if(!submitted){
+    submitAnswer();
+    return;
+  }
+  if(currentIndex < QUESTIONS.length - 1){
+    currentIndex++;
+    renderQuestion();
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  } else {
+    location.href = "index.html";
+  }
+});
+
+document.getElementById("passBtn").addEventListener("click", () => {
+  if(currentIndex < QUESTIONS.length - 1){
+    currentIndex++;
+    renderQuestion();
+  } else {
+    location.href = "index.html";
+  }
+});
+
+document.getElementById("backBtn").addEventListener("click", () => {
+  location.href = "index.html";
+});
+
+let seconds = 0;
+setInterval(() => {
+  seconds++;
+  const m = String(Math.floor(seconds / 60)).padStart(2, "0");
+  const s = String(seconds % 60).padStart(2, "0");
+  document.getElementById("timer").textContent = m + ":" + s;
+}, 1000);
+
+document.addEventListener("keydown", e => {
+  if(e.key >= "1" && e.key <= "4"){
+    const el = optionsEl.querySelector(`.option[data-index="${Number(e.key) - 1}"]`);
+    if(el && !submitted) el.click();
+  }
+  if(e.key === "Enter" && !submitBtn.disabled) submitBtn.click();
+});
+
+const aiBall = document.getElementById("aiBall");
+const aiPanel = document.getElementById("aiPanel");
+const aiBody = document.getElementById("aiBody");
+const aiInput = document.getElementById("aiInput");
+let greeted = false;
+
+function addMsg(text, who){
+  const div = document.createElement("div");
+  div.className = "msg " + who;
+  div.textContent = text;
+  aiBody.appendChild(div);
+  aiBody.scrollTop = aiBody.scrollHeight;
+}
+
+function reply(text){
+  const t = text || "";
+  if(t.includes("提示")) return "提示：不要急着记结论，先把 p、s 和 p 原来后继这三个结点的关系画出来。关键在于「哪一步会覆盖指针」。";
+  if(t.includes("知识点")) return "这道题考查的是链式存储结构中的指针操作顺序。核心原则只有一句：先接新链，再断旧链，保证任何时刻都不丢失后续结点。";
+  if(t.includes("计划")) return "建议今晚先完成本章剩余题目，明天用二十分钟重做错题，后天再回头做一次综合练习。间隔重复比一次性刷完更有效。";
+  return "我在。你可以把卡住的步骤说出来，或者直接问我这道题的某个选项为什么不对。";
+}
+
+aiBall.addEventListener("click", () => {
+  aiPanel.classList.toggle("open");
+  if(!greeted && aiPanel.classList.contains("open")){
+    greeted = true;
+    setTimeout(() => addMsg("我是心月狐。别急，先深呼吸——吸气 4 秒，呼气 6 秒。我们一步一步来，需要提示时我只点思路，不直接给答案。", "bot"), 180);
+  }
+});
+document.getElementById("aiClose").addEventListener("click", () => aiPanel.classList.remove("open"));
+document.getElementById("hintBtn").addEventListener("click", () => {
+  aiPanel.classList.add("open");
+  addMsg("给我一点提示", "me");
+  setTimeout(() => addMsg(reply("提示"), "bot"), 380);
+});
+
+function send(text){
+  const value = (text || aiInput.value).trim();
+  if(!value) return;
+  addMsg(value, "me");
+  aiInput.value = "";
+  setTimeout(() => addMsg(reply(value), "bot"), 420);
+}
+document.getElementById("aiSend").addEventListener("click", () => send());
+aiInput.addEventListener("keydown", e => { if(e.key === "Enter") send(); });
+document.querySelectorAll("#aiQuick button").forEach(b => b.addEventListener("click", () => send(b.dataset.q)));
+
+renderQuestion();
+</script>
+</body>
+</html>
