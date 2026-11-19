@@ -1,5 +1,7 @@
 server:
   port: 8080
+  tomcat:
+    max-http-form-post-size: 500MB
 
 spring:
   application:
@@ -29,8 +31,9 @@ spring:
     property-naming-strategy: SNAKE_CASE
   servlet:
     multipart:
-      max-file-size: 5MB
-      max-request-size: 10MB
+      # 教材解析（PDF/TXT/MD）上限与旧版一致
+      max-file-size: 500MB
+      max-request-size: 520MB
 
 mybatis-plus:
   configuration:
@@ -47,6 +50,11 @@ studyflow:
   uploads-dir: ${UPLOADS_DIR:uploads}
   # 预留 frontend/dist 托管；为空则不挂载（本地可设为 ../代码/frontend/dist 试切流）
   frontend-dist: ${FRONTEND_DIST:}
+  ai:
+    base-url: ${AI_BASE_URL:http://127.0.0.1:8001}
+    internal-token: ${AI_INTERNAL_TOKEN:studyflow-dev-token}
+    connect-timeout-seconds: 10
+    read-timeout-seconds: 180
 
 logging:
   level:

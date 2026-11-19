@@ -80,3 +80,108 @@ java -jar target/studyflow-java-0.0.1-SNAPSHOT.jar
 - P2：作答判分、错题本、统计、错因 CRUD、上传存储；
 - P4：AiClient、ai_jobs 任务执行、AI 接线；
 - 删除级联、写接口等均未实现，保持“只读链路”范围。
+
+---
+
+# P4 实现备注（2026-11-19）
+
+## 1. 范围与依赖
+
+- 接入 P3 Python 服务的 `/ai/generate-questions`、`/ai/parse-material`、`/ai/variants`、`/ai/chat`。
+- 未新增 Maven 依赖：`RestClient`、`@Async` 均由 Spring Boot 3.5.16 提供。
+- `application.yml` 新增 `studyflow.ai`：
+  - `base-url` 默认 `http://127.0.0.1:8001`
+  - `internal-token` 默认 `studyflow-dev-token`（可用 `AI_INTERNAL_TOKEN` 覆盖）
+  - 连接超时 10s、读超时 180s
+- `AiClient` 使用 Spring Boot 自动配置的 `RestClient.Builder`，确保复用全局 SNAKE_CASE
+  `ObjectMapper`（否则请求/响应字段会与 Python 的 snake_case 对不上）。
+  连接失败返回 503；Python 非 2xx、信封 `ok=false` 返回 502，均带明确 `detail`，不吞异常。
+
+## 2. 异步出题
+
+- `POST /api/chapters/{id}/generate` 只做参数校验、建 `ai_jobs(status=pending)`，立即返回 `{"job_id":"job-xxxxxxxx"}`。
+- `GET /api/ai-jobs/{id}` 返回 `{status, result, error}`；状态：`pending / running / success / failed`。
+- 线程池 `aiTaskExecutor`（core 2 / max 4 / queue 50），线程名 `ai-job-*`。
+- 章节正文由 Java 从 `material_chunks` 中按旧算法定位（`ChapterTextService`，
+  照搬 `extract_chapter_text` 的正则与匹配规则），不回调 Python。
+- 落库规则：
+  - Python 的 `options` 用 Jackson 序列化为 A/B/C/D 顺序 JSON 数组文本；
+  - 固定 `type='single'`、`source='AI 生成'`、`tags='{章节名},AI出题'`；
+  - `difficulty` 整批使用请求里的整数；
+  - `prob-{8hex}` / `kp-{8hex}`；知识点在本章内按去空白名称先查后建、同名复用；
+  - 知识点 + 题目在 `GenerationPersistenceService.persist` 的**同一事务**中提交，任一失败全回滚；
+  - Java 侧再次校验题干/4 选项/答案/解析/知识点，任一题不合规则整批失败；
+  - 全部被 Python 丢弃（questions 为空）时任务失败，不写任何业务数据。
+  - 成功时 `result_json` 存 `{generated,dropped,total_in_chapter,drop_reasons}`，日志打印 dropped 与原因。
+
+## 3. 教材链路
+
+- `POST /api/materials/upload`（multipart：`file` / `title` / `subject_id`）：
+  - 文件落盘 `uploads/materials/{12hex}_{原文件名}`，再 base64 调 `/ai/parse-material`；
+  - Python 返回的 `chunks` 直接写 `material_chunks`（完整 UUID）；
+  - `materials.id` 也是完整 UUID；`created_at` 可空（本实现写入当前时间）；
+  - 解析失败/落库失败都会删除刚写入的磁盘文件；落库事务包含 materials + chunks + 解析任务。
+- **大纲草案持久化**：数据库只允许新增 `ai_jobs`，因此把 Python 的 `outline + warnings`
+  存进一条 `ai_jobs(type='parse-material', status='success')` 的 `result_json`
+  （对应方案 6.1 的「Java 写 material_chunks + 大纲草案，job=success」）。
+  job id 采用确定性格式 `job-{materialId去掉连字符}`，`GET /api/materials/{id}/outline`
+  直接按 id 读 Java 库，不回调 Python。
+- 旧数据（P1 前的 material）没有这条 job，outline 返回空 chapters +
+  「该教材没有解析大纲，请重新上传教材生成大纲」提示，不 500。
+- `POST /api/materials/{id}/outline/confirm`：按请求数组顺序写 chapters，
+  `order_num = 该科目现有最大 order_num + 创建序号`；同名跳过；
+  无 subject_id 时新建科目，**使用 `sub-` 前缀**（旧实现的 `subj-` 是笔误，按 CLAUDE.md 修正）。
+- 另补齐 `GET /api/materials`、`GET /api/materials/{id}/chunks`、`DELETE /api/materials/{id}`，
+  行为与旧版一致（删除保留磁盘文件）。
+
+## 4. 聊天
+
+- `POST /api/chat`：先校验 `question_id`（题目不存在返回 404，不留下空会话），
+  取该会话最近 20 条（10 轮）消息，按正序传给 `/ai/chat`。
+- 题目上下文透传 `title / options（A-D 数组）/ correct_answer / explanation`；
+  本期尚未做 P2，故不再查询最近一次作答。
+- 会话 id：`session-{8hex}`；新建时 `title = message[:40]`，写入 `created_at / updated_at`。
+- AI 回复成功后才在一个事务里写两条 `chat_messages`（user + assistant），
+  自增 id 不手动赋值；同时更新会话 `updated_at`。AI 失败不会写消息。
+- 补齐 `GET /api/chat/sessions`、`GET /api/chat/sessions/{id}/messages`、
+  `DELETE /api/chat/sessions/{id}` 供前端恢复历史。
+
+## 5. 变式
+
+- `POST /api/recommend`：查母题与层级 -> `/ai/variants`，响应字段保持旧版
+  `{problem_id, problem_title, recommendations}`。
+- `POST /api/variants/from-recommendation`：只保存，不调用 AI；
+  `origin='ai'`，`var-{8hex}`，批量插入在一个事务中。
+- 另补 `GET /api/variants`、`POST /api/variants`（手动保存，`origin='manual'`），
+  方便旧前端现有调用。
+
+## 6. 降级行为（实测）
+
+停掉 8001 后：
+
+| 功能 | 结果 |
+|---|---|
+| `GET /api/subjects`、`GET /api/problems`、登录、`POST /api/problems/search` | 200，正常 |
+| `GET /api/materials/{id}/outline`、`GET /api/variants` | 200，读 Java 库 |
+| `POST /api/materials/upload` | 503 `AI 服务不可用，请确认 studyflow-ai-service 已启动` |
+| `POST /api/chat` | 503，同上 |
+| `POST /api/recommend` | 503，同上 |
+| `POST /api/chapters/{id}/generate` | 先返回 job_id，随后任务变 `failed`，error 同上，题库无新增 |
+
+## 7. P4 验收产生的数据
+
+- 教材：`73b6df78-7b76-46ce-a9d2-13f0b052249e`（P4 Linear Algebra，2 页 455 字符）
+- 科目：`sub-357731e6`；章节：`chap-743e0c40`（第一章 行列式）、`chap-a04e0f84`（第二章 矩阵）
+- 出题任务成功：`job-80e8abd3`（generated=2, dropped=0, total_in_chapter=2）
+- 题目：`prob-669c15cd`、`prob-98942ab1`；知识点：`kp-7e25d2a3`、`kp-96ae7dae`
+- 聊天会话：`session-d86db942`（2 条消息）
+- 变式：`var-f659335d`
+- 降级任务失败：`job-514aee22`（无业务数据写入）
+
+## 8. 已知缺口
+
+- **P2 未实现**：`/api/attempts`、`/api/wrong-book` 等接口仍不存在（404）。
+  因此降级验收中的「做题、错题本仍正常」当前无法演示；需要先做 P2。
+- 出题若采用同步等待会超过网关超时，因此按方案改为异步；
+  前端 P5 切流时需把 `generateChapterQuestions` 改成「提交任务 + 轮询 `/api/ai-jobs/{id}`」。
+- 重启时未增加「把遗留 pending/running 任务标失败」的补偿扫描；本期验收未涉及。
