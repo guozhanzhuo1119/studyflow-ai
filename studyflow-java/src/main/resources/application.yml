@@ -1,0 +1,53 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: studyflow-java
+  # 本地开发密码放在 studyflow-java/.env（已 gitignore），避免把真实密码写进仓库。
+  # 同时兼容从仓库根目录或 studyflow-java/ 目录启动。
+  config:
+    import: optional:file:./.env[.properties],optional:file:./studyflow-java/.env[.properties]
+  autoconfigure:
+    # 不使用 Spring Security 的表单/内存用户，JWT 由 /api/auth/me 手动校验
+    exclude: org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration
+  datasource:
+    url: ${DB_URL:jdbc:mysql://localhost:3306/studyflow_ai?useUnicode=true&characterEncoding=utf8&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Asia/Shanghai}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+    # 旧库已有 13 张表和真实数据：以 version 0 建立基线，再执行 V1。
+    # V1 全部是 CREATE TABLE IF NOT EXISTS，因此不会动既有表。
+    baseline-on-migrate: true
+    baseline-version: 0
+    validate-on-migrate: true
+  jackson:
+    # 前端契约：所有 JSON 字段 snake_case
+    property-naming-strategy: SNAKE_CASE
+  servlet:
+    multipart:
+      max-file-size: 5MB
+      max-request-size: 10MB
+
+mybatis-plus:
+  configuration:
+    map-underscore-to-camel-case: true
+  global-config:
+    db-config:
+      id-type: input
+
+studyflow:
+  jwt:
+    # 与旧版 app/services/auth.py 的默认值保持一致，迁移期旧 token 仍可用
+    secret: ${JWT_SECRET:your-secret-key-change-in-production}
+    expire-minutes: 10080
+  uploads-dir: ${UPLOADS_DIR:uploads}
+  # 预留 frontend/dist 托管；为空则不挂载（本地可设为 ../代码/frontend/dist 试切流）
+  frontend-dist: ${FRONTEND_DIST:}
+
+logging:
+  level:
+    com.studyflow: info
