@@ -123,7 +123,8 @@ POST /ai/parse-material
 → { "ok": true, "data": {
       "title": "高等数学",
       "chunks": [{"seq":1,"heading":"第一章 极限","content":"..."}],
-      "outline": [{"title":"第一章 极限","children":[{"title":"1.1 数列极限"}]}],
+      // 扁平结构，与 build_outline() 产出、GET /api/materials/{id}/outline 的 chapters 完全一致
+      "outline": [{"name":"第一章 极限","start_page":1,"end_page":18,"page_count":18,"chunk_count":24}],
       "warnings": ["第 37 页为扫描件，已跳过"]
   }}
 ```
@@ -133,23 +134,28 @@ POST /ai/parse-material
 ```
 POST /ai/generate-questions
 { "chapter_title": "1.1 数列极限", "chapter_content": "……正文……",
-  "count": 5, "difficulty": "easy", "existing_titles": ["..."] }
+  "count": 5, "difficulty": 3, "existing_titles": ["..."] }   // difficulty 为整数 1~5
 → { "ok": true, "data": {
       "questions": [{
-        "stem": "...", "options": {"1":"...","2":"...","3":"...","4":"..."},
-        "answer": "2", "explanation": "...",
-        "knowledge_point": "极限的ε-N定义", "difficulty": "easy", "type": "single_choice"
+        "title": "...",                                   // 对应 problems.title，不是 stem
+        "options": ["A 选项文字","B 选项文字","C 选项文字","D 选项文字"],  // A/B/C/D 顺序的数组
+        "answer": "B",                                     // 字母，不是 1~4
+        "explanation": "...",
+        "knowledge_point": "极限的ε-N定义"
       }],
       "dropped": 1, "drop_reasons": ["第 3 题选项不足 4 个"]
   }}
 ```
+
+> `type`（固定 `single`）、`source`（`AI 生成`）、`tags`（`{章节名},AI出题`）、`difficulty`（整批统一）由 **Java 侧写入**，Python 不返回。
+> 这样 Java 拿到响应即可直接 `json.dumps(options)` 落 `problems.options`，不需要任何格式转换。
 
 ### 5.3 陪练（**不含工具调用**）
 
 ```
 POST /ai/chat
 { "persona": "xinyuehu",
-  "question": {"stem":"...","options":{...},"user_answer":"1","correct_answer":"2"},
+  "question": {"title":"...","options":["A选项","B选项","C选项","D选项"],"user_answer":"A","correct_answer":"B"},
   "history": [{"role":"user","content":"..."},{"role":"assistant","content":"..."}],
   "message": "我还是不懂为什么选 2" }
 → { "ok": true, "data": { "reply": "..." } }
@@ -163,9 +169,14 @@ POST /ai/chat
 
 ```
 POST /ai/variants
-{ "stem":"...", "options":{...}, "answer":"2", "explanation":"...", "count":2 }
-→ { "ok": true, "data": { "variants":[{...}], "dropped":0 } }
+{ "stem":"...", "options":["A选项","B选项","C选项","D选项"], "answer":"B", "explanation":"...",
+  "hierarchy":{"subject_name":"...","chapter_name":"...","knowledge_point_name":"..."},
+  "source":"...", "tags":"...", "count":2 }
+→ { "ok": true, "data": { "variants":[{"title":"...","difficulty":"easy|medium|hard","link":"https://...","reason":"..."}], "dropped":0 } }
 ```
+
+> `options` / `answer` / `explanation` 接收但**本期不参与 prompt**（旧实现只用题干 + 层级 + 来源 + 标签）。要注入须改 prompt，属算法变更，二期再做。
+> `difficulty` 在这里是 `easy/medium/hard`（对应 `variants.difficulty`），与出题接口的整数 1~5 是两套语义，不要混用。
 
 ### 5.5 错因判定 —— **本期不做**
 
@@ -471,6 +482,32 @@ spring:
 - 索引数据来自 `problems`，零数据库后 Python 无从获取
 - 强行保留就得设计"Java 推送索引"协议，属于二期工作
 - 本期替代方案：`/api/problems/search` 走 MySQL 关键词（标题 + 题干 LIKE / 全文索引），教材检索留 Java
+
+### 14.12 接口字段一律用旧库格式（§5.1～§5.4 已按此修正）
+
+原则只有一条：**Python 的出入参直接对齐 MySQL 表结构和前端既有字段，Java 侧不做任何格式转换。**
+
+| 位置 | 旧格式（唯一正确） | 错误写法 |
+|---|---|---|
+| 教材大纲 | `{name,start_page,end_page,page_count,chunk_count}` 扁平数组 | `{title,children:[...]}` 嵌套树 |
+| 出题-题干 | `title` | `stem` |
+| 出题-选项 | `["A文字","B文字","C文字","D文字"]` | `{"1":"...","4":"..."}` |
+| 出题-答案 | `"A"~"D"` | `"1"~"4"` |
+| 出题-题型 | Java 写死 `single` | `single_choice` |
+| 出题-难度 | 整数 1~5 | `easy/medium/hard` |
+| 变式-难度 | `easy/medium/hard` | 1~5 |
+
+理由：
+
+- `build_outline()` 的真实产出就是扁平数组；`GET /api/materials/{id}/outline` 返回的 `chapters` 也是这个结构，前端 `OutlineConfirm` 直接按 `{name,start_page,end_page}` 提交。改成嵌套树需要新增归并算法，且前端要改，违反"照搬不重写"。
+- `problems.options` 是 **A/B/C/D 顺序的 JSON 数组文本**，`answer` 是单个字母，`type` 默认 `single`，`difficulty` 是整数。前端 `v-for="(text, index) in options"` 直接遍历数组，索引 0 即 A。
+- 刷题页显示的 1/2/3/4 是 **UI 序号**，由前端 `optionLabel(index)` 映射，不是数据格式。
+
+### 14.13 RAG 下线后 `recommend.py` 的处理
+
+`services/recommend.py` 顶部 `from app.rag.retriever import semantic_search`，删掉 `app/rag/` 后会直接 ImportError。
+
+处理方式：删掉该 import 与检索调用，prompt 模板里的 `{retrieval_context}` **传空字符串**（模板保留，不删字段）。推荐质量下降是本期已接受的代价（见 §14.11），在 NOTES.md 注明"本期无 RAG 上下文，二期补"，不要临时造一个假检索。
 
 ---
 
