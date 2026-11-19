@@ -3,6 +3,7 @@ package com.studyflow.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.studyflow.common.ApiException;
 import com.studyflow.dto.ChapterView;
+import com.studyflow.dto.WriteDtos;
 import com.studyflow.entity.Chapter;
 import com.studyflow.entity.KnowledgePoint;
 import com.studyflow.entity.Subject;
@@ -11,8 +12,10 @@ import com.studyflow.mapper.KnowledgePointMapper;
 import com.studyflow.mapper.SubjectMapper;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class ChapterService {
@@ -53,6 +56,33 @@ public class ChapterService {
         return toView(chapter);
     }
 
+    public ChapterView create(WriteDtos.ChapterRequest request) {
+        Subject subject = request.subjectId() == null ? null : subjectMapper.selectById(request.subjectId());
+        if (subject == null) {
+            throw new ApiException(404, "科目不存在");
+        }
+        Chapter chapter = new Chapter();
+        chapter.setId("chap-" + shortId());
+        chapter.setSubjectId(request.subjectId());
+        chapter.setName(request.name());
+        chapter.setOrderNum(request.orderNum() == null ? 0 : request.orderNum());
+        chapter.setCreatedAt(LocalDateTime.now());
+        chapterMapper.insert(chapter);
+        return toView(chapter);
+    }
+
+    public ChapterView update(String chapterId, WriteDtos.ChapterRequest request) {
+        Chapter chapter = chapterMapper.selectById(chapterId);
+        if (chapter == null) {
+            throw new ApiException(404, "章节不存在");
+        }
+        chapter.setSubjectId(request.subjectId());
+        chapter.setName(request.name());
+        chapter.setOrderNum(request.orderNum() == null ? 0 : request.orderNum());
+        chapterMapper.updateById(chapter);
+        return toView(chapter);
+    }
+
     private ChapterView toView(Chapter chapter) {
         Subject subject = chapter.getSubjectId() == null
                 ? null
@@ -67,5 +97,9 @@ public class ChapterService {
                 chapter.getOrderNum(),
                 knowledgePointCount == null ? 0L : knowledgePointCount,
                 chapter.getCreatedAt());
+    }
+
+    private static String shortId() {
+        return UUID.randomUUID().toString().replace("-", "").substring(0, 8);
     }
 }

@@ -3,6 +3,7 @@ package com.studyflow.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.studyflow.common.ApiException;
 import com.studyflow.dto.KnowledgePointView;
+import com.studyflow.dto.WriteDtos;
 import com.studyflow.entity.Chapter;
 import com.studyflow.entity.KnowledgePoint;
 import com.studyflow.entity.Problem;
@@ -13,8 +14,10 @@ import com.studyflow.mapper.ProblemMapper;
 import com.studyflow.mapper.SubjectMapper;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 @Service
 public class KnowledgePointService {
@@ -56,6 +59,31 @@ public class KnowledgePointService {
         return toView(knowledgePoint);
     }
 
+    public KnowledgePointView create(WriteDtos.KnowledgePointRequest request) {
+        Chapter chapter = request.chapterId() == null ? null : chapterMapper.selectById(request.chapterId());
+        if (chapter == null) {
+            throw new ApiException(404, "章节不存在");
+        }
+        KnowledgePoint knowledgePoint = new KnowledgePoint();
+        knowledgePoint.setId("kp-" + shortId());
+        knowledgePoint.setChapterId(request.chapterId());
+        knowledgePoint.setName(request.name());
+        knowledgePoint.setCreatedAt(LocalDateTime.now());
+        knowledgePointMapper.insert(knowledgePoint);
+        return toView(knowledgePoint);
+    }
+
+    public KnowledgePointView update(String knowledgePointId, WriteDtos.KnowledgePointRequest request) {
+        KnowledgePoint knowledgePoint = knowledgePointMapper.selectById(knowledgePointId);
+        if (knowledgePoint == null) {
+            throw new ApiException(404, "知识点不存在");
+        }
+        knowledgePoint.setChapterId(request.chapterId());
+        knowledgePoint.setName(request.name());
+        knowledgePointMapper.updateById(knowledgePoint);
+        return toView(knowledgePoint);
+    }
+
     private KnowledgePointView toView(KnowledgePoint knowledgePoint) {
         Chapter chapter = knowledgePoint.getChapterId() == null
                 ? null
@@ -74,5 +102,9 @@ public class KnowledgePointService {
                 knowledgePoint.getName(),
                 problemCount == null ? 0L : problemCount,
                 knowledgePoint.getCreatedAt());
+    }
+
+    private static String shortId() {
+        return UUID.randomUUID().toString().replace("-", "").substring(0, 8);
     }
 }

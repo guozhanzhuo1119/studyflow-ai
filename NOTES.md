@@ -180,8 +180,80 @@ java -jar target/studyflow-java-0.0.1-SNAPSHOT.jar
 
 ## 8. 已知缺口
 
-- **P2 未实现**：`/api/attempts`、`/api/wrong-book` 等接口仍不存在（404）。
-  因此降级验收中的「做题、错题本仍正常」当前无法演示；需要先做 P2。
+- **P2 当时未实现**（`/api/attempts`、`/api/wrong-book` 曾为 404）。
+  P2 已在后续提交补齐，原始降级验收里的「做题、错题本仍正常」现在可以复验。
 - 出题若采用同步等待会超过网关超时，因此按方案改为异步；
   前端 P5 切流时需把 `generateChapterQuestions` 改成「提交任务 + 轮询 `/api/ai-jobs/{id}`」。
 - 重启时未增加「把遗留 pending/running 任务标失败」的补偿扫描；本期验收未涉及。
+
+---
+
+# P2 实现备注（2026-11-19）
+
+## 1. V2 迁移
+
+- `V2__add_client_token.sql`：
+  `ALTER TABLE attempts ADD COLUMN client_token VARCHAR(64) NULL;`
+  `ALTER TABLE attempts ADD UNIQUE KEY uk_attempts_client_token (client_token);`
+- 注释已写明这是有意变更：旧表连这一列都没有；历史行保持 NULL，唯一索引允许多个 NULL。
+- 实测：`flyway_schema_history` 版本 2 success=1，`attempts.client_token` 列与
+  `uk_attempts_client_token` 唯一索引均存在；重启后 `up to date`，历史记录不重复。
+
+## 2. 作答与判分
+
+- `POST /api/attempts` 同时支持旧前端的两种用法：
+  - 传 `user_answers`：服务端查 `problems.answer` 归一化后按集合完全相等判分；
+  - 只传 `result`：兼容旧版「记录做对/做错」按钮，不重新判分。
+- 题目答案为空时按本次需求返回 `400 {"detail":"该题无答案"}`（旧版文案不同，以本次要求为准）。
+- 变题传 `user_answers` 返回「变题没有标准答案，无法自动判分」；
+  `result` 只接受 `correct / wrong`（工作区版本已移除 giveup）。
+- 一次作答与 `wrong_book`、可选 `error_analyses` 在同一事务提交。
+- `client_token` 可选（旧前端不传）：
+  - 先按 token 查，存在则直接返回上次 `id / result / stats`，不重新判分；
+  - 插入时唯一冲突（并发）会整体回滚，再查回上次结果返回，不重复累加。
+- 答错 upsert wrong_book：已存在则 `wrong_count + 1`、复位 mastered；
+  答对只把未掌握行置为已掌握，不删除记录。
+- `GET /api/attempts/overview`、`GET /api/attempts/{target_type}/{target_id}` 按旧版字段输出。
+
+## 3. 错题本
+
+- `GET /api/wrong-book?mastered=&target_type=`：
+  - `items` 字段与旧 serializer 逐字一致；
+  - `total / unmastered` 是**全表**统计，不受过滤条件影响；
+  - 排序：mastered 升序 → `COALESCE(last_wrong_at, created_at)` 降序 → id 降序。
+- problem 类型会补知识点/章节/科目层级；variant 类型这些字段为 null。
+
+## 4. 错因档案（全 Java 规则）
+
+- `/api/errors/meta`：6 类错因、SYNTAX 标签、2 种补救状态、6 步决策树、presets。
+- `/api/errors/decide`：严格照搬 `apply_decision_tree` 的命中/兜底规则。
+- `/api/errors/statistics`：练习模式 6 个字段；`practice_mode=false` 追加 accuracy / avg_time_sec / stability。
+- `/api/errors` 列表/创建/更新/删除：
+  - `error_type` 白名单、`tag` 仅 OPERATE 可挂 SYNTAX、`first_break_point` 缺省等于 error_type；
+  - `specific_behavior` 按 API 的 50 字校验（库宽 200 保留）；
+  - DECOMPOSE 必须写含「=」「母题」「改」的拆解句，其他类型不允许填；
+  - 返回字段含 `error_type_name`；创建响应含 `suggest_syntax_tag`。
+- errors 相关 Java 文件没有任何 `AiClient` 引用（验收脚本 grep 断言）。
+
+## 5. 写接口与级联删除
+
+- 已补 subjects / chapters / knowledge-points / problems / variants 的 POST / PUT / DELETE。
+- 手写级联：Subject → Chapter → KnowledgePoint → Problem → Variant；
+  `attempts / wrong_book / error_analyses` 不随题目删除，与旧版一致。
+- 删除响应三种结构原样保留：
+  - subject：`{"code":0,"message":"删除成功","deletedProblems":n}`
+  - chapter / knowledge-point：`{"message":"删除成功","deletedProblems":n}`
+- 注意：全局 SNAKE_CASE 会把 `deletedProblems` 转成 `deleted_problems`，
+  因此 `WriteDtos` 里对这两个字段显式加了 `@JsonProperty("deletedProblems")`。
+- `problems` 的 DELETE 只删母题及其 variants；不删 attempts/wrong_book/error_analyses。
+
+## 6. 验收脚本
+
+- 位置：`scripts/verify-p2.sh`；默认在 **18080** 启动独立 Java 实例，不影响 8080。
+- 覆盖：V2 迁移/重启、全部写接口、判分、无答案题 400、幂等、错题本、
+  overview/history、错因 6 条决策分支、错因 CRUD、50 字限制、
+  级联删除三种响应结构、attempts/wrong_book/error_analyses 保留、errors 代码无 AiClient。
+- 最近一次执行：`PASS: 95   FAIL: 0`。
+- 脚本使用随机 fixture ID，结束后清理测试 attempts/wrong_book/error_analyses；
+  不会动 P4 的教材/科目/题目数据。当前库基线恢复为
+  attempts=15、wrong_book=3、error_analyses=1。

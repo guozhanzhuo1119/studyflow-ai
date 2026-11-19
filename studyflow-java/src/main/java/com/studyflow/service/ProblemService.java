@@ -9,6 +9,7 @@ import com.studyflow.dto.ProblemSearchRequest;
 import com.studyflow.dto.ProblemSearchResponse;
 import com.studyflow.dto.ProblemSearchResult;
 import com.studyflow.dto.ProblemView;
+import com.studyflow.dto.WriteDtos;
 import com.studyflow.entity.Chapter;
 import com.studyflow.entity.KnowledgePoint;
 import com.studyflow.entity.Problem;
@@ -19,10 +20,12 @@ import com.studyflow.mapper.ProblemMapper;
 import com.studyflow.mapper.SubjectMapper;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.UUID;
 
 @Service
 public class ProblemService {
@@ -67,6 +70,36 @@ public class ProblemService {
         if (problem == null) {
             throw new ApiException(404, "题目不存在");
         }
+        return toView(problem);
+    }
+
+    public ProblemView create(WriteDtos.ProblemRequest request) {
+        Problem problem = new Problem();
+        problem.setId("prob-" + shortId());
+        problem.setTitle(request.title());
+        problem.setContent(request.content());
+        problem.setSource(request.source());
+        problem.setTags(request.tags());
+        problem.setKnowledgePointId(request.knowledgePointId());
+        problem.setType("single");
+        problem.setDifficulty(3);
+        problem.setStatus("todo");
+        problem.setCreatedAt(LocalDateTime.now());
+        problemMapper.insert(problem);
+        return toView(problem);
+    }
+
+    public ProblemView update(String problemId, WriteDtos.ProblemRequest request) {
+        Problem problem = problemMapper.selectById(problemId);
+        if (problem == null) {
+            throw new ApiException(404, "题目不存在");
+        }
+        problem.setTitle(request.title());
+        problem.setContent(request.content());
+        problem.setSource(request.source());
+        problem.setTags(request.tags());
+        problem.setKnowledgePointId(request.knowledgePointId());
+        problemMapper.updateById(problem);
         return toView(problem);
     }
 
@@ -179,5 +212,9 @@ public class ProblemService {
         } catch (JsonProcessingException ex) {
             return List.of();
         }
+    }
+
+    private static String shortId() {
+        return UUID.randomUUID().toString().replace("-", "").substring(0, 8);
     }
 }

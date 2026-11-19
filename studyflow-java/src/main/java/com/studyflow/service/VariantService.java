@@ -91,6 +91,14 @@ public class VariantService {
                 problem.getId(), problem.getTitle(), recommendations);
     }
 
+    public VariantDtos.VariantView get(String variantId) {
+        Variant variant = variantMapper.selectById(variantId);
+        if (variant == null) {
+            throw new ApiException(404, "变题不存在");
+        }
+        return toView(variant);
+    }
+
     public List<VariantDtos.VariantView> list(String problemId) {
         LambdaQueryWrapper<Variant> query = new LambdaQueryWrapper<>();
         if (problemId != null && !problemId.isBlank()) {
@@ -114,6 +122,31 @@ public class VariantService {
                 request.difficulty(), request.link(), request.reason(), "manual");
         variantMapper.insert(variant);
         return toView(variant, problem.getTitle());
+    }
+
+    @Transactional
+    public VariantDtos.VariantView update(String variantId, VariantDtos.VariantCreateRequest request) {
+        Variant variant = variantMapper.selectById(variantId);
+        if (variant == null) {
+            throw new ApiException(404, "变题不存在");
+        }
+        Problem problem = requireProblem(request.problemId(), "母题不存在");
+        variant.setProblemId(request.problemId());
+        variant.setTitle(request.title());
+        variant.setContent(request.content());
+        variant.setDifficulty(request.difficulty());
+        variant.setLink(request.link());
+        variant.setReason(request.reason());
+        variantMapper.updateById(variant);
+        return toView(variant, problem.getTitle());
+    }
+
+    public void delete(String variantId) {
+        Variant variant = variantMapper.selectById(variantId);
+        if (variant == null) {
+            throw new ApiException(404, "变题不存在");
+        }
+        variantMapper.deleteById(variantId);
     }
 
     @Transactional

@@ -2,11 +2,15 @@ package com.studyflow.controller;
 
 import com.studyflow.dto.ChapterView;
 import com.studyflow.dto.JobDtos;
+import com.studyflow.dto.WriteDtos;
 import com.studyflow.service.AiJobService;
+import com.studyflow.service.CascadeDeleteService;
 import com.studyflow.service.ChapterService;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -20,10 +24,14 @@ public class ChapterController {
 
     private final ChapterService chapterService;
     private final AiJobService aiJobService;
+    private final CascadeDeleteService cascadeDeleteService;
 
-    public ChapterController(ChapterService chapterService, AiJobService aiJobService) {
+    public ChapterController(ChapterService chapterService,
+                             AiJobService aiJobService,
+                             CascadeDeleteService cascadeDeleteService) {
         this.chapterService = chapterService;
         this.aiJobService = aiJobService;
+        this.cascadeDeleteService = cascadeDeleteService;
     }
 
     @GetMapping
@@ -34,6 +42,23 @@ public class ChapterController {
     @GetMapping("/{chapterId}")
     public ChapterView get(@PathVariable String chapterId) {
         return chapterService.get(chapterId);
+    }
+
+    @PostMapping
+    public ChapterView create(@RequestBody WriteDtos.ChapterRequest request) {
+        return chapterService.create(request);
+    }
+
+    @PutMapping("/{chapterId}")
+    public ChapterView update(@PathVariable String chapterId,
+                              @RequestBody WriteDtos.ChapterRequest request) {
+        return chapterService.update(chapterId, request);
+    }
+
+    @DeleteMapping("/{chapterId}")
+    public WriteDtos.DeleteResponse delete(@PathVariable String chapterId) {
+        long deletedProblems = cascadeDeleteService.deleteChapter(chapterId);
+        return new WriteDtos.DeleteResponse("删除成功", deletedProblems);
     }
 
     /**
