@@ -395,7 +395,8 @@ spring:
 
 ## 十四、代码核对后的修正（**优先级高于前文**）
 
-> 以下 10 条来自对 `代码/` 的实际核对，逐条已确认。前文与本节的冲突，一律以本节为准。
+> 以下各条来自对 `代码/` 的实际核对，逐条已确认。前文与本节的冲突，一律以本节为准。
+> **真实 DDL 已导出到 `schema/studyflow_ai.sql`（13 张表，来自运行中的 MySQL `studyflow_ai`），Flyway V1 以它为准，不要凭 models 猜。**
 
 ### 14.1 错因判定不走 AI —— 整个模块留 Java
 
@@ -469,7 +470,7 @@ spring:
 | `error_analyses.specific_behavior` | 库长 **200**，API 校验 **≤50** | 按 API 的 50 校验（宽度 200 保留） |
 | `materials.created_at` | **可空** | 实体用可空类型，勿设 NOT NULL |
 | ID 格式 | `user-` `sub-` `chap-` `kp-` `prob-` `var-` `session-` 前缀；materials / chunks 是完整 UUID | Java 必须生成同格式，前端与既有数据都依赖 |
-| `attempts` 唯一约束 | **不存在**（代码里 catch IntegrityError 实际打不到） | Flyway 加 `UNIQUE(client_token)`，幂等才真实生效（**有意变更，需在 V2 脚本中说明**） |
+| `attempts` 幂等列 | 真实表**连 `client_token` 列都没有**（只有 id/target_type/target_id/result/duration_sec/error_reason/source/created_at），旧代码里 `catch IntegrityError` 永远打不到 | V2 需 `ADD COLUMN client_token` + `UNIQUE`（允许 NULL，历史行留空），并在脚本注释里说明是有意变更 |
 
 ### 14.10 路由静态段顺序
 
