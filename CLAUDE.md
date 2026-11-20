@@ -7,7 +7,7 @@
 | `代码/` | **旧版 Python 单体（只读参考）** | FastAPI + LangChain + FAISS + Vue3。**禁止修改**，只作为接口与表结构的基准 |
 | `studyflow-java/` | **新建：Java 业务主服务** | Spring Boot 3 + MyBatis-Plus + MySQL + Flyway，唯一写库方 |
 | `studyflow-ai-service/` | **新建：Python AI 能力服务** | 从 `代码/` 瘦身而来，只暴露 `/ai/**`，**零数据库** |
-| `解耦方案-Java+Python.md` | 架构方案（唯一设计依据） | 切分边界、接口契约、迁移顺序都在里面 |
+| `docs/解耦方案-Java+Python.md` | 架构方案（唯一设计依据） | 切分边界、接口契约、迁移顺序都在里面 |
 
 ## 绝对禁止（违反即返工）
 
@@ -73,4 +73,4 @@
 
 - 每个阶段结束必须：真实执行验证命令 → 贴出真实输出 → `git commit`
 - 不确定的表结构或接口，去读 `代码/app/models/` 和 `代码/app/routers/`，**不要猜**
-- 实现与方案冲突时，以 `解耦方案-Java+Python.md` 为准；方案未覆盖的，选改动更小的方案并写入 `实现备注.md`
+- 实现与方案冲突时，以 `docs/解耦方案-Java+Python.md` 为准；方案未覆盖的，选改动更小的方案并写入 `实现备注.md`
