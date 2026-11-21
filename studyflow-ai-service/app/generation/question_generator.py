@@ -22,7 +22,7 @@ MAX_TEXT = 6000        # 单次喂给模型的章节正文上限，避免超出�
 MIN_TITLE = 8          # 题干最少字数
 MIN_EXPLANATION = 20   # 解析最少字数
 
-
+# 这个类描述了一道题长什么样子，是pydantic的模型,pydantic就是负责校验，挡住不合法的请求以及返回的json要干净
 class GeneratedQuestion(BaseModel):
     title: str = Field(description='题干，不含选项内容，不少于 8 个字')
     option_a: str = Field(description='A 选项的完整文字')
@@ -34,12 +34,13 @@ class GeneratedQuestion(BaseModel):
     knowledge_point: str = Field(description='这道题考查的知识点，不超过 20 字')
 
 
+# 这个类是模型的整体返回，是pydantic的模型，这两个类都是schema，是数据格式规定的意思
 class QuestionPlan(BaseModel):
     questions: List[GeneratedQuestion] = Field(description='生成的单项选择题')
 
-
 PARSER = PydanticOutputParser(pydantic_object=QuestionPlan)
 
+# 把模型返回的content统一成字符串，兼容 content 为字符串或分段列表两种返回格式
 def _message_text(message) -> str:
     """兼容 content 为字符串或分段列表两种返回格式。"""
     content = getattr(message, 'content', message)
@@ -55,7 +56,7 @@ def _message_text(message) -> str:
         return ''.join(parts)
     return str(content)
 
-
+# 去掉代码块标记，保留内容
 def _strip_fences(text: str) -> str:
     text = (text or '').strip()
     if text.startswith('```'):
@@ -64,7 +65,7 @@ def _strip_fences(text: str) -> str:
             text = text[:-3]
     return text.strip()
 
-
+# 触发模型生成题目
 def _ask_questions(
     chapter_title: str,
     context: str,
@@ -108,13 +109,14 @@ def _ask_questions(
         status_code=502,
     )
 
-
+# 去重用的标题归一化：去掉选项字母、空白、大小写差异
 def _normalize_title(value: str) -> str:
     """去重用的标题归一化：去掉选项字母、空白、大小写差异"""
     text = re.sub(r'^[A-Da-d]\s*[.、．)）]\s*', '', (value or '').strip())
     return re.sub(r'\s+', '', text).lower()
 
 
+# 题目校验
 def _validate(item: GeneratedQuestion) -> Tuple[Dict | None, str]:
     """返回 (合格题数据, 丢弃原因)；不合格时数据为 None"""
     title = (item.title or '').strip()
@@ -149,13 +151,15 @@ def _validate(item: GeneratedQuestion) -> Tuple[Dict | None, str]:
     }, ''
 
 
+# 难度校验
 def _validate_difficulty(value: int) -> int:
     """problems.difficulty 是整数 1~5；出题接口不做 easy/medium/hard 映射。"""
     if isinstance(value, bool) or not isinstance(value, int) or not 1 <= value <= 5:
         raise ServiceError('invalid_difficulty', 'difficulty 必须是 1~5 的整数')
     return value
 
-
+#主入口，对外总指挥，被 api/generate_questions.py 调用。纯函数（不写库），
+# 职责是「参数校验 → 触发生成 → 逐题清洗 → 去重 → 汇总结果」
 def generate_questions_payload(
     chapter_title: str,
     chapter_content: str,

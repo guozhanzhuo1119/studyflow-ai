@@ -1,4 +1,4 @@
-"""服务配置：只保留 AI 服务所需的环境变量，不包含任何数据库配置。"""
+"""服务配置：只保留 AI 服务所需的环境变量，这个文件夹就是负责集中读环境变量"""
 
 import os
 from pathlib import Path
@@ -18,6 +18,10 @@ DEEPSEEK_API_KEY = os.getenv('DEEPSEEK_API_KEY')
 DEEPSEEK_BASE_URL = os.getenv('DEEPSEEK_BASE_URL') or 'https://api.deepseek.com/v1'
 DEEPSEEK_MODEL = os.getenv('DEEPSEEK_MODEL') or 'deepseek-chat'
 LLM_TIMEOUT_SECONDS = int(os.getenv('LLM_TIMEOUT_SECONDS') or '120')
+LLM_PROVIDER = os.getenv('LLM_PROVIDER') or 'deepseek'
+OLLAMA_BASE_URL = os.getenv('OLLAMA_BASE_URL') or 'http://localhost:11434/v1'
+OLLAMA_MODEL = os.getenv('OLLAMA_MODEL') or 'qwen2.5:7b'
+
 
 AI_SERVICE_HOST = os.getenv('AI_SERVICE_HOST') or '0.0.0.0'
 AI_SERVICE_PORT = int(os.getenv('AI_SERVICE_PORT') or '8001')

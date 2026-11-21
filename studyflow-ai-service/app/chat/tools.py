@@ -22,7 +22,15 @@ MAX_POW_BASE = 1e9
 MAX_INT_BITS = 4096
 _EXPRESSION_PATTERN = re.compile(r'[0-9+\-*/().\s^]+')
 
-
+'''query 清洗 → 空则直接返回提示
+   ↓
+top_k 钳制到 1~10（防模型乱传参数）
+   ↓
+调 search_semantic() 做向量相似度检索（RAG）
+   ↓
+没结果 → 返回"当前没有已建索引的题目"
+有结果 → 拼成带编号的多行字符串：
+   "1. [题目id] 相似度 0.8732：题干内容..."'''
 @tool
 def rag_search_problems(query: str, top_k: int = 3) -> str:
     """只读检索题库：按自然语言查询返回最相关的已索引题目（id、相似度、题干）。
@@ -41,7 +49,7 @@ def rag_search_problems(query: str, top_k: int = 3) -> str:
         for index, item in enumerate(results, start=1)
     )
 
-
+#
 def _eval_node(node):
     """递归求值 AST；只放行数字、四则运算、正负号与乘方。"""
     if isinstance(node, ast.Expression):
@@ -85,7 +93,7 @@ def _eval_node(node):
 
     raise ValueError('表达式包含不允许的语法（变量、函数或代码）')
 
-
+#
 @tool
 def safe_math_eval(expression: str) -> str:
     """只读计算器：对纯算术表达式求值，支持数字、+ - * / ( ) 和 ^ 乘方。

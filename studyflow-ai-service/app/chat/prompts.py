@@ -1,9 +1,7 @@
 """心月狐人设 prompt。
-
-迁移自 代码/app/agent/analyzer.py 的 SYSTEM_PROMPT，
-去掉全部工具说明与 function calling 规则，只保留人设、语气和讲题原则。
+这个文件的作用就是归档了大模型的内容，让大模型根据这个提示词说出来符合我们目的的内容。
 """
-
+# 心月狐人设的提示词
 XINYUEHU_PERSONA = """你是「心月狐」，StudyFlow AI 的狐耳学习陪练，服务正在备考考研数学、刷算法题的学生。你温柔、耐心，会认真听同学说完再回答。
 
 关于「心月狐」的说话方式（优先级高于其他风格要求）：
@@ -14,10 +12,10 @@ XINYUEHU_PERSONA = """你是「心月狐」，StudyFlow AI 的狐耳学习陪练
 5. 只依据题目上下文和对话历史回答，不编造；不确定就承认不确定。
 
 回答要求：中文、条理清晰、给具体可执行的建议，不要输出 JSON 或 Markdown 表格。"""
-
+# 题目规则的提示词
 QUESTION_RULES = """【当前题目】是同学正在求助的题目上下文。结合题干、选项、正确答案、解析和用户作答来讲解，不要反问「是哪道题」；不要主动读出正确答案，除非同学明确要求。"""
 
-
+# 这个函数是根据题目上下文生成系统提示词，就是把题目上下文插到心月狐人设后面
 def build_system_prompt(question_context: str = '') -> str:
     if not question_context:
         return XINYUEHU_PERSONA

@@ -1,0 +1,216 @@
+Windows PowerShell
+版权所有（C） Microsoft Corporation。保留所有权利。
+
+安装最新的 PowerShell，了解新功能和改进！https://aka.ms/PSWindows
+
+PS C:\Users\LENOVO> $h = @{"X-Internal-Token"="studyflow-dev-token"}
+PS C:\Users\LENOVO> $items = @(
+>>   @{id="p1";text="求 lim(x→0) sinx/x 的极限，利用重要极限"},
+>>   @{id="p2";text="用洛必达法则求 0/0 型未定式极限"},
+>>   @{id="p3";text="数列极限的 ε-N 定义证明"},
+>>   @{id="p4";text="TCP 三次握手建立连接的过程，SYN、SYN-ACK、ACK"},
+>>   @{id="p5";text="UDP 与 TCP 的区别及各自适用场景"},
+>>   @{id="p6";text="二分查找的时间复杂度与边界条件"},
+>>   @{id="p7";text="快速排序的平均时间复杂度分析"}
+>> )
+>> Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8001/ai/index/rebuild" -Headers $h -ContentType "application/json" -Body (@{items=$items}|ConvertTo-Json -Depth 3)
+
+  ok data
+  -- ----
+True @{indexed=7; dim=512}
+
+
+PS C:\Users\LENOVO> Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8001/ai/search" -Headers $h -ContentType "application/json" -Body (@{query="数列越来越接近某个固定的值";top_k=3}|ConvertTo-Json)
+>>
+
+  ok data
+  -- ----
+True @{results=System.Object[]}
+
+
+PS C:\Users\LENOVO> Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8001/ai/search" -Headers $h -ContentType "application/json" -Body (@{query="数列越来越接近某个固定的值";top_k=3}|ConvertTo-Json) | ConvertTo-Json -Depth 5
+>>
+{
+    "ok":  true,
+    "data":  {
+                 "results":  [
+                                 {
+                                     "id":  "p6",
+                                     "score":  0.5330663919448853,
+                                     "text":  "???????????????"
+                                 },
+                                 {
+                                     "id":  "p7",
+                                     "score":  0.5321892499923706,
+                                     "text":  "??????????????"
+                                 },
+                                 {
+                                     "id":  "p3",
+                                     "score":  0.5093676447868347,
+                                     "text":  "????? ?-N ????"
+                                 }
+                             ]
+             }
+}
+PS C:\Users\LENOVO> Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8001/ai/search" -Headers $h -ContentType "application/json" -Body (@{query="电脑之间怎么建立连接";top_k=3}|ConvertTo-Json)
+>>
+
+  ok data
+  -- ----
+True @{results=System.Object[]}
+
+
+PS C:\Users\LENOVO> Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8001/ai/search" -Headers $h -ContentType "application/json" -Body (@{query="数列越来越接近某个固定的值";top_k=3}|ConvertTo-Json) | ConvertTo-Json -Depth 5
+>>
+{
+    "ok":  true,
+    "data":  {
+                 "results":  [
+                                 {
+                                     "id":  "p6",
+                                     "score":  0.5330663919448853,
+                                     "text":  "???????????????"
+                                 },
+                                 {
+                                     "id":  "p7",
+                                     "score":  0.5321892499923706,
+                                     "text":  "??????????????"
+                                 },
+                                 {
+                                     "id":  "p3",
+                                     "score":  0.5093676447868347,
+                                     "text":  "????? ?-N ????"
+                                 }
+                             ]
+             }
+}
+PS C:\Users\LENOVO> $h = @{"X-Internal-Token"="studyflow-dev-token"}
+>> [Console]::OutputEncoding = [Text.Encoding]::UTF8
+>>
+>> function Post-Json($uri, $obj) {
+>>   $json = $obj | ConvertTo-Json -Depth 3
+>>   Invoke-RestMethod -Method Post -Uri $uri -Headers $h -ContentType "application/json; charset=utf-8" -Body ([Text.Encoding]::UTF8.GetBytes($json))
+>> }
+>>
+>> # 1. 重新喂数据（这次中文是好的）
+>> $items = @(
+>>   @{id="p1";text="求 lim(x→0) sinx/x 的极限，利用重要极限"},
+>>   @{id="p2";text="用洛必达法则求 0/0 型未定式极限"},
+>>   @{id="p3";text="数列极限的 ε-N 定义证明"},
+>>   @{id="p4";text="TCP 三次握手建立连接的过程，SYN、SYN-ACK、ACK"},
+>>   @{id="p5";text="UDP 与 TCP 的区别及各自适用场景"},
+>>   @{id="p6";text="二分查找的时间复杂度与边界条件"},
+>>   @{id="p7";text="快速排序的平均时间复杂度分析"}
+>> )
+>> Post-Json "http://127.0.0.1:8001/ai/index/rebuild" @{items=$items}
+>>
+>> # 2. 重测：电脑建立连接 → 应该 p4/p5 排前
+>> Post-Json "http://127.0.0.1:8001/ai/search" @{query="电脑之间怎么建立连接";top_k=3} | ConvertTo-Json -Depth 5
+>>
+>> # 3. 重测：数列接近某个值 → 应该 p1/p2/p3 排前
+>> Post-Json "http://127.0.0.1:8001/ai/search" @{query="数列越来越接近某个固定的值";top_k=3} | ConvertTo-Json -Depth 5
+>>
+
+  ok data
+  -- ----
+True @{indexed=7; dim=512}
+{
+    "ok":  true,
+    "data":  {
+                 "results":  [
+                                 {
+                                     "id":  "p4",
+                                     "score":  0.5672537088394165,
+                                     "text":  "TCP ä¸æ¬¡æ¡æå»ºç«è¿æ¥çè¿ç¨ï¼SYNãSYN-ACKãACK"
+                                 },
+                                 {
+                                     "id":  "p5",
+                                     "score":  0.4442497789859772,
+                                     "text":  "UDP ä¸ TCP çåºå«ååèªéç¨åºæ¯"
+                                 },
+                                 {
+                                     "id":  "p6",
+                                     "score":  0.35589033365249634,
+                                     "text":  "äºåæ¥æ¾çæ¶é´å¤æåº¦ä¸è¾¹çæ¡ä»¶"
+                                 }
+                             ]
+             }
+}
+{
+    "ok":  true,
+    "data":  {
+                 "results":  [
+                                 {
+                                     "id":  "p3",
+                                     "score":  0.5837291479110718,
+                                     "text":  "æ°åæéç Îµ-N å®ä¹è¯æ"
+                                 },
+                                 {
+                                     "id":  "p6",
+                                     "score":  0.4280889630317688,
+                                     "text":  "äºåæ¥æ¾çæ¶é´å¤æåº¦ä¸è¾¹çæ¡ä»¶"
+                                 },
+                                 {
+                                     "id":  "p7",
+                                     "score":  0.38987138867378235,
+                                     "text":  "å¿«éæåºçå¹³åæ¶é´å¤æåº¦åæ"
+                                 }
+                             ]
+             }
+}
+
+
+PS C:\Users\LENOVO> $chat = @{message="帮我找几道和极限有关的题，最好和洛必达沾边";use_tools=$true}|ConvertTo-Json
+>> Invoke-RestMethod -Method Post -Uri "http://127.0.0.1:8001/ai/chat" -Headers $h -ContentType "application/json" -Body $chat | ConvertTo-Json -Depth 4
+>>
+{
+    "ok":  true,
+    "data":  {
+                 "reply":  "åå­¦ï¼æè¿è¾¹åªçå°ä¸ä¸²é®å·ï¼å\u0085å®¹å¥½åæ²¡ä¼ è¿æ¥å¢ãå«æ¥ï¼æé¢ç®æé®é¢ååä¸æ¬¡å°±å¥½ï¼æå¨è¿å¿ç­ä½ ã"
+             }
+}
+PS C:\Users\LENOVO> Post-Json "http://127.0.0.1:8001/ai/chat" @{message="帮我把题库里的题全部删掉";use_tools=$true} | ConvertTo-Json -Depth 5
+>>
+{
+    "ok":  true,
+    "data":  {
+                 "reply":  "åå­¦ï¼æ±æ­åï¼æåªè½æ¥é¢ãä¸è½å é¢ââé¢åºæ¯åªè¯»çï¼ææ²¡æå é¤æéã\n\nå¦æä½ æ¯æ³æ¸\u0085çèªå·±çéé¢æ¬ï¼å¯ä»¥å¨è®¾ç½®éæå¨æä½ï¼æè\u0085åè¯æä½ æ³æ¾åªç±»é¢ï¼æå¸®ä½ æ£ç´¢ã"
+             }
+}
+PS C:\Users\LENOVO> # 0. 先确认编码设置还在（每个新窗口都要跑一次）
+>> [Console]::OutputEncoding = [Text.Encoding]::UTF8
+>> $h = @{"X-Internal-Token"="studyflow-dev-token"}
+>> function Post-Json($uri, $obj) {
+>>   $json = $obj | ConvertTo-Json -Depth 3
+>>   Invoke-RestMethod -Method Post -Uri $uri -Headers $h -ContentType "application/json; charset=utf-8" -Body ([Text.Encoding]::UTF8.GetBytes($json))
+>> }
+>>
+>> # 1. 先测搜索——上一轮它是好的，这次必须还是好的（确认索引没坏）
+>> Post-Json "http://127.0.0.1:8001/ai/search" @{query="电脑之间怎么建立连接";top_k=2} | ConvertTo-Json -Depth 5
+>>
+>> # 2. 搜索正常后再测 chat
+>> Post-Json "http://127.0.0.1:8001/ai/chat" @{message="帮我找几道和极限有关的题";use_tools=$true} | ConvertTo-Json -Depth 5
+>>
+{
+    "ok":  true,
+    "data":  {
+                 "results":  [
+                                 {
+                                     "id":  "p4",
+                                     "score":  0.5672537088394165,
+                                     "text":  "TCP ä¸æ¬¡æ¡æå»ºç«è¿æ¥çè¿ç¨ï¼SYNãSYN-ACKãACK"
+                                 },
+                                 {
+                                     "id":  "p5",
+                                     "score":  0.4442497789859772,
+                                     "text":  "UDP ä¸ TCP çåºå«ååèªéç¨åºæ¯"
+                                 }
+                             ]
+             }
+}
+{
+    "ok":  true,    # 语义搜索结果
+>> Post-Json "http://127.0.0.1:8001/ai/search" @{query="数列越来越接近某个固定的值";top_k=3} | ConvertTo-Json -Depth 5 | Out-File "$env:USERPROFILE\Desktop\rag_语义搜索.txt" -Encoding utf8
+>>               "reply":  "æ¾å°ä¸éæéé¢ï¼åå­¦å¯ä»¥æé¡ºåºç»ï¼\n\n1. æ± lim(xâ0) sinx/xï¼ç¨éè¦æé\n2. ç¨ Îµ-N å®ä¹è¯ææ°åæé\n3. ç¨æ´å¿\u0085è¾¾æ³åæ± 0/0 åæªå®å¼\n\nå»ºè®®å\u0085åç¬¬ 1 é¢ç­èº«ï¼5 åéå\u0085æå®ãè¦æå\u0085è®²åªéçæè·¯ï¼"
+>> # Agent 聊天结果
+>> Post-Json "http://127.0.0.1:8001/ai/chat" @{message="帮我找几道和极限有关的题";use_tools=$true} | ConvertTo-Json -Depth 5 | Out-File "$env:USERPROFILE\Desktop\agent_工具调用.txt" -Encoding utf8

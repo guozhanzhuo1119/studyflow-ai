@@ -1,9 +1,5 @@
 """AI 变体题推荐（纯函数）。
-
-迁移自 代码/app/services/recommend.py：
-- 保留 recommend_variants(problem, hierarchy, count) 签名、prompt 与 Pydantic 解析
-- 去掉 FAISS 语义检索（本期下线），因此不再构造题库检索上下文
-- 不接收 db、不写库
+这个文件是只负责出变式题的，不处理数据库
 """
 
 import logging
@@ -18,7 +14,7 @@ from app.llm.client import get_llm
 
 logger = logging.getLogger(__name__)
 
-
+# 这个类就是给 API 层规定的输入结构
 @dataclass
 class ProblemInput:
     """母题的最小字段集合；由 API 层从请求体构造。"""
@@ -28,7 +24,7 @@ class ProblemInput:
     source: str = ''
     tags: str = ''
 
-
+# 这个类也是规定输出结果的结构
 class Recommendation(BaseModel):
     """单条变体题推荐"""
 
@@ -53,7 +49,7 @@ class Recommendation(BaseModel):
         value = (value or '').strip()
         return value if value.startswith(('http://', 'https://')) else ''
 
-
+# 这个类也是规定输出结果的结构
 class RecommendationList(BaseModel):
     """变体题推荐结果"""
 
@@ -87,7 +83,7 @@ DEFAULT_STYLE_HINT = '题目描述要清晰，说明考查什么知识点或模�
 # 本期无 RAG 上下文，二期补（§14.13）；模板中的 {retrieval_context} 保留，传空字符串。
 RETRIEVAL_CONTEXT = ''
 
-
+#把「科目 / 章节 / 知识点」三个可能为空的字段，拼成一行人话
 def _hierarchy_text(hierarchy: Dict[str, str] | None) -> str:
     """把科目 / 章节 / 知识点拼成一行可读文本"""
     if not hierarchy:
@@ -99,14 +95,17 @@ def _hierarchy_text(hierarchy: Dict[str, str] | None) -> str:
     )
     return ' / '.join(name for name in names if name)
 
-
+# 判断是否是考研题，是则优先推荐考研题
 def _is_exam_style(problem, hierarchy) -> bool:
     source = (getattr(problem, 'source', '') or '').lower()
     hierarchy_name = _hierarchy_text(hierarchy).lower()
     keywords = ['考研', '真题', '张宇', '李永乐', '汤家凤', '数学']
     return any(k in source or k in hierarchy_name for k in keywords)
 
-
+# 调用 LLM 链，用chain流水线
+#chain = LangChain 用 | 运算符把「提示模板 → 大模型 → 输出解析器」三个组件拼成的一条可调用流水线。
+# chain.invoke(payload) 就是把参数从流水线一头送进去、让它自动跑完所有环节、从另一头拿出结构化结果。
+# 本质是**「声明式的流程编排」，替代手写的一步步命令式调用**
 def _invoke_chain(payload: Dict) -> RecommendationList:
     chain = ChatPromptTemplate.from_messages([
         ('system', SYSTEM_PROMPT),
@@ -114,7 +113,7 @@ def _invoke_chain(payload: Dict) -> RecommendationList:
     ]) | get_llm(temperature=0.7) | parser
     return chain.invoke(payload)
 
-
+#主入口，「把母题信息填进模板 → 用管道调模型并解析 → 重试 + 兜底」，实现变式题推荐
 def recommend_variants(problem, hierarchy: Dict[str, str] | None = None, count: int = 5) -> List[Dict]:
     """根据母题推荐变体题，返回稳定的结构化列表"""
     payload = {

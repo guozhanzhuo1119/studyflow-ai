@@ -1,6 +1,5 @@
 """心月狐陪练：system prompt + 题目上下文 + 最近历史 + 用户消息 -> 一段回复。
 
-不含 function calling、不查库、不写库、不存会话。
 """
 
 import logging
@@ -18,7 +17,15 @@ logger = logging.getLogger(__name__)
 MAX_HISTORY_MESSAGES = 20  # 与旧版 DBMessageHistory 的 limit=20 保持一致
 MAX_TOOL_ROUNDS = 3       # 工具循环上限：3 轮后强制生成最终回复，避免死循环
 
-
+#① 白名单校验
+#TOOLS_BY_NAME.get(name) 查不到就拒绝
+#防止模型被注入后调用未授权工具
+#② 异常兜底
+#try/except 包裹 tool.invoke(args)
+#工具报错不中断整轮对话，把错误信息当内容回传
+#③ 结果归一化
+#无论成功/失败/拒绝，统一返回 ToolMessage
+#保证模型总能收到格式一致的响应
 def _run_tool(tool_call) -> ToolMessage:
     """执行单个工具调用；未在白名单内的工具一律拒绝。"""
     name = tool_call.get('name') or ''
@@ -41,12 +48,14 @@ def _run_tool(tool_call) -> ToolMessage:
 
     return ToolMessage(content=content, tool_call_id=call_id, name=name)
 
-
+#反复让模型决策是否调用工具、执行工具、把结果喂回去，直到模型认为信息足够给出最终回答，或者触发轮次上限被强制"收网"
 def _invoke_with_tools(model, messages: list) -> BaseMessage:
     """模型决定调工具 -> 代码执行 -> 结果回传，最多 MAX_TOOL_ROUNDS 轮。"""
+    #模型响应
     tool_model = model.bind_tools(TOOLS)
     for round_no in range(1, MAX_TOOL_ROUNDS + 1):
         result = tool_model.invoke(messages)
+    #响应中有 tool_calls？
         tool_calls = getattr(result, 'tool_calls', None) or []
         if not tool_calls:
             return result
@@ -57,14 +66,15 @@ def _invoke_with_tools(model, messages: list) -> BaseMessage:
             MAX_TOOL_ROUNDS,
             [(call.get('name'), call.get('args')) for call in tool_calls],
         )
+    # 保留模型意图，把结果和工具调用一并传入下一轮
         messages.append(result)
         for call in tool_calls:
             messages.append(_run_tool(call))
-
+    #工具调用达到上限，强制生成最终回复
     logger.warning('工具调用达到 %s 轮上限，强制生成最终回复', MAX_TOOL_ROUNDS)
     return model.invoke(messages)
 
-
+#这个函数负责把选项拼成字符串
 def _format_options(options) -> str:
     """options 是旧库的 A/B/C/D 顺序数组，索引 0 即 A。"""
     if not isinstance(options, list) or not options:
@@ -74,9 +84,8 @@ def _format_options(options) -> str:
         for index, text in enumerate(options[:4])
     )
 
-
+#这个函数负责把题目拼成上下文
 def format_question_context(question) -> str:
-    """把当前题目拼成上下文；旧版 routers/chat.py 的格式，去掉 DB 查询。"""
     if question is None:
         return ''
 
@@ -103,7 +112,7 @@ def format_question_context(question) -> str:
 
     return '\n'.join(lines) if len(lines) > 1 else ''
 
-
+#这个函数负责把消息对象转成 langchain 的消息对象
 def _to_message(item) -> BaseMessage:
     role = getattr(item, 'role', 'user')
     content = getattr(item, 'content', '')
@@ -113,7 +122,7 @@ def _to_message(item) -> BaseMessage:
         return SystemMessage(content=content)
     return HumanMessage(content=content)
 
-
+#这个函数负责把消息对象转成字符串
 def _extract_text(message) -> str:
     """兼容 content 为字符串或分段列表两种返回格式。"""
     content = getattr(message, 'content', message)
@@ -129,14 +138,15 @@ def _extract_text(message) -> str:
         return ''.join(parts)
     return str(content)
 
-
+#主函数，调用前面的4个功能的函数
 def chat_reply(persona: str, question, history: List, message: str, use_tools: bool = True) -> str:
     if persona and persona != 'xinyuehu':
         logger.warning('未知 persona=%s，回退到心月狐人设', persona)
-
+    #调用format_question_context函数把题目拼成上下文
     question_context = format_question_context(question)
+    #调用_to_message函数把消息对象转成 langchain 的消息对象
     history_messages = [_to_message(item) for item in (history or [])][-MAX_HISTORY_MESSAGES:]
-
+    #调 build_system_prompt（来自 prompts.py）—— 生成系统提示
     messages = [
         SystemMessage(content=build_system_prompt(question_context)),
         *history_messages,
@@ -144,6 +154,7 @@ def chat_reply(persona: str, question, history: List, message: str, use_tools: b
     ]
 
     try:
+        #调用 get_llm 函数(来自 client.py)获取语言模型
         model = get_llm(temperature=0.3)
         if use_tools:
             result = _invoke_with_tools(model, messages)
@@ -159,7 +170,7 @@ def chat_reply(persona: str, question, history: List, message: str, use_tools: b
             f'模型调用失败：{type(error).__name__}: {error}',
             status_code=502,
         ) from error
-
+    #调用 _extract_text 从模型返回里面抠出纯文本
     reply = _extract_text(result).strip()
     if not reply:
         raise ServiceError('empty_reply', '模型没有返回内容', status_code=502)

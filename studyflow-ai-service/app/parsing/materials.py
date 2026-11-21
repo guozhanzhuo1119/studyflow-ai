@@ -1,7 +1,5 @@
 """教材解析：PDF/TXT/Markdown -> 文本分块 + 章节大纲草案。
-
-迁移自 代码/app/services/materials.py 与 chapter_outline.py。
-只保留纯文本计算：不接收 db、不写库、不生成数据库 ID。
+将教材文本分块
 """
 
 import base64
@@ -21,7 +19,7 @@ ALLOWED_EXTS = {'pdf', 'txt', 'md', 'markdown'}
 MAX_SIZE = 500 * 1024 * 1024
 MAX_TEXT = 2_000_000
 
-
+#extract_pages_from_bytes：PDF 用 pymupdf 逐页抽文字；TXT/MD 当一页
 def extract_pages_from_bytes(data: bytes, file_type: str) -> List[Tuple[int, str]]:
     """返回 [(页码, 该页原文)]；TXT/MD 视为单页。
 
@@ -41,7 +39,7 @@ def extract_pages_from_bytes(data: bytes, file_type: str) -> List[Tuple[int, str
     text = data.decode('utf-8', errors='ignore')
     return [(1, text)]
 
-
+#清洗——全角空格转半角、统一换行、压缩多余空白。
 def normalize_text(text: str) -> str:
     text = (text or '').replace('　', ' ')
     text = re.sub(r'\r\n?', '\n', text)
@@ -49,7 +47,9 @@ def normalize_text(text: str) -> str:
     text = re.sub(r'\n{3,}', '\n\n', text)
     return text.strip()
 
-
+#贪心合并段落切块，目标每块约 1000 字。有两个防坑设计：
+#超长段落按句号再切，不从句子中间截断；
+#尾部短块并入前一块（第 82 行注释）——否则「第X章」这种标题会因为太短被单独丢掉。
 def split_text(text: str, size: int = CHUNK_SIZE) -> List[str]:
     """按段落贪心合并，避免把句子从中间截断"""
     if not text:
@@ -88,7 +88,7 @@ def split_text(text: str, size: int = CHUNK_SIZE) -> List[str]:
             merged.append(piece)
     return merged or ([text] if text else [])
 
-
+#把页文本切成分块；返回 (chunks, 总字符数, 质量标记)。
 def build_chunks(pages: List[Tuple[int, str]]) -> Tuple[List[dict], int, str]:
     """把页文本切成分块；返回 (chunks, 总字符数, 质量标记)。"""
     chunks: List[dict] = []
@@ -114,7 +114,8 @@ def _file_type_from_name(filename: str) -> str:
         return ''
     return filename.rsplit('.', 1)[-1].lower()
 
-
+#parse_material_payload（主入口，被 api/parse_material.py 调）：
+# Base64 解码、格式/大小校验 → 抽页 → 分块 → 调 build_outline 生成大纲 → 汇总返回。
 def parse_material_payload(
     filename: str = '',
     content_base64: str | None = None,
