@@ -2,6 +2,12 @@
 
 AI 刷题平台：上传教材 PDF 自动解析章节，用大模型按章节出单项选择题，刷题判分进错题本，另有按人设回复的情感陪练。本项目已完成从 Python 单体到 **Java 业务服务 + 无状态 AI 服务** 的绞杀者模式迁移（完整演进历史见提交记录）。
 
+## 架构演进
+
+- **v1：Python 单体**（FastAPI + LangChain + FAISS + Vue3）。RAG 与 Agent 都在单体里，Agent 工具直连数据库、可写业务表。
+- **v2：Java + 无状态 AI 服务**。Java 成为唯一写库方；AI 服务零数据库，只暴露 `/ai/**`。
+- **RAG 与 Agent 在 v2 重建**：FAISS 索引改为由 Java 喂数据的内存索引（重启即失、可全量重建）；Agent 改为受限 Function Calling，只挂白名单内的**只读**工具（题库语义检索、安全算术），写操作永远留在 Java。
+
 ## 架构
 
 ```
@@ -10,7 +16,7 @@ AI 刷题平台：上传教材 PDF 自动解析章节，用大模型按章节出
     ▼
 Java 业务服务 :8080 ──────────► MySQL studyflow_ai（13 张表 + ai_jobs）
     │  业务 · 判分 · 错题本 · 错因 · 异步任务
-    │  仅 4 个 AI 能力走内网（X-Internal-Token）
+    │  AI 能力与 RAG 检索走内网（X-Internal-Token）
     ▼
 Python AI 服务 :8001 ─────────► DeepSeek / 本地模型
     零数据库 · 无状态
@@ -22,7 +28,7 @@ Python AI 服务 :8001 ─────────► DeepSeek / 本地模型
 
 ```
 studyflow-java/       Spring Boot 3.5 + MyBatis-Plus + Flyway，15 个 Controller
-studyflow-ai-service/ FastAPI，仅 5 个端点，无数据库依赖
+studyflow-ai-service/ FastAPI，8 个端点（4 个 AI 能力 + RAG 索引/检索 3 个），无数据库依赖
 frontend/             Vue 3 + Element Plus（构建产物由 Java 托管）
 schema/               真实表结构 DDL（Flyway V1 以此为准）
 scripts/              verify-p1 / verify-p2 自动化验收脚本

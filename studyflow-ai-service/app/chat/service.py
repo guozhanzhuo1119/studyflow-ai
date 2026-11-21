@@ -6,15 +6,63 @@
 import logging
 from typing import List
 
-from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage
+from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
 
 from app.chat.prompts import build_system_prompt
+from app.chat.tools import TOOLS, TOOLS_BY_NAME
 from app.core.errors import ServiceError
 from app.llm.client import get_llm
 
 logger = logging.getLogger(__name__)
 
 MAX_HISTORY_MESSAGES = 20  # 与旧版 DBMessageHistory 的 limit=20 保持一致
+MAX_TOOL_ROUNDS = 3       # 工具循环上限：3 轮后强制生成最终回复，避免死循环
+
+
+def _run_tool(tool_call) -> ToolMessage:
+    """执行单个工具调用；未在白名单内的工具一律拒绝。"""
+    name = tool_call.get('name') or ''
+    args = tool_call.get('args') or {}
+    call_id = tool_call.get('id') or ''
+
+    tool = TOOLS_BY_NAME.get(name)
+    if tool is None:
+        logger.warning('拒绝白名单外的工具：%s', name)
+        content = f'工具 {name} 不在白名单内，无法执行。'
+    else:
+        logger.info('调用工具 %s 参数=%s', name, args)
+        try:
+            content = tool.invoke(args)
+        except Exception as error:  # 工具失败也要回传给模型，不能中断对话
+            logger.warning('工具 %s 执行失败：%s', name, error)
+            content = f'工具执行失败：{error}'
+        else:
+            logger.info('工具 %s 返回：%s', name, content[:200])
+
+    return ToolMessage(content=content, tool_call_id=call_id, name=name)
+
+
+def _invoke_with_tools(model, messages: list) -> BaseMessage:
+    """模型决定调工具 -> 代码执行 -> 结果回传，最多 MAX_TOOL_ROUNDS 轮。"""
+    tool_model = model.bind_tools(TOOLS)
+    for round_no in range(1, MAX_TOOL_ROUNDS + 1):
+        result = tool_model.invoke(messages)
+        tool_calls = getattr(result, 'tool_calls', None) or []
+        if not tool_calls:
+            return result
+
+        logger.info(
+            '第 %s/%s 轮工具调用：%s',
+            round_no,
+            MAX_TOOL_ROUNDS,
+            [(call.get('name'), call.get('args')) for call in tool_calls],
+        )
+        messages.append(result)
+        for call in tool_calls:
+            messages.append(_run_tool(call))
+
+    logger.warning('工具调用达到 %s 轮上限，强制生成最终回复', MAX_TOOL_ROUNDS)
+    return model.invoke(messages)
 
 
 def _format_options(options) -> str:
@@ -82,7 +130,7 @@ def _extract_text(message) -> str:
     return str(content)
 
 
-def chat_reply(persona: str, question, history: List, message: str) -> str:
+def chat_reply(persona: str, question, history: List, message: str, use_tools: bool = True) -> str:
     if persona and persona != 'xinyuehu':
         logger.warning('未知 persona=%s，回退到心月狐人设', persona)
 
@@ -96,7 +144,12 @@ def chat_reply(persona: str, question, history: List, message: str) -> str:
     ]
 
     try:
-        result = get_llm(temperature=0.3).invoke(messages)
+        model = get_llm(temperature=0.3)
+        if use_tools:
+            result = _invoke_with_tools(model, messages)
+        else:
+            # 完全走旧路径：不 bind_tools，单次调用
+            result = model.invoke(messages)
     except ServiceError:
         raise
     except Exception as error:

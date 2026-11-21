@@ -60,6 +60,8 @@ class ChatRequest(BaseModel):
     question: ChatQuestion | None = None
     history: list[ChatHistoryItem] = Field(default_factory=list)
     message: str = Field(..., min_length=1)
+    # 默认开启受限工具调用；Java 不传该字段时行为不变（只是多了只读工具能力）。
+    use_tools: bool = True
 
 
 class IndexItem(BaseModel):

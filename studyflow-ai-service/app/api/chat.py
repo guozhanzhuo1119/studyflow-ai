@@ -1,4 +1,4 @@
-"""POST /ai/chat：心月狐陪练，只做 prompt + 上下文 + 历史，不支持工具调用。"""
+"""POST /ai/chat：心月狐陪练；默认挂载受限的只读工具，可用 use_tools=false 关闭。"""
 
 from fastapi import APIRouter
 
@@ -16,5 +16,6 @@ def chat(data: ChatRequest):
         question=data.question,
         history=data.history,
         message=data.message,
+        use_tools=data.use_tools,
     )
     return ok({'reply': reply})
