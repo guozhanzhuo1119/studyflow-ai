@@ -7,7 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
-from app.api import chat, generate_questions, health, parse_material, variants
+from app.api import chat, generate_questions, health, parse_material, rag, variants
 from app.core.config import AI_SERVICE_HOST, AI_SERVICE_PORT
 from app.core.errors import ServiceError
 from app.core.responses import fail
@@ -35,6 +35,7 @@ app.include_router(parse_material.router)
 app.include_router(generate_questions.router)
 app.include_router(variants.router)
 app.include_router(chat.router)
+app.include_router(rag.router)
 
 
 @app.exception_handler(ServiceError)

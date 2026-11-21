@@ -60,3 +60,19 @@ class ChatRequest(BaseModel):
     question: ChatQuestion | None = None
     history: list[ChatHistoryItem] = Field(default_factory=list)
     message: str = Field(..., min_length=1)
+
+
+class IndexItem(BaseModel):
+    id: str = Field(..., min_length=1)
+    text: str = Field(..., min_length=1)
+
+
+class IndexRebuildRequest(BaseModel):
+    # 空 items 由 API 层返回 400（而非 422），与其余业务错误保持一致。
+    items: list[IndexItem] = Field(default_factory=list)
+
+
+class SearchRequest(BaseModel):
+    # 空 query 由 API 层返回 400；top_k 不合法仍走统一 422。
+    query: str = ''
+    top_k: int = Field(default=5, ge=1, le=50)
